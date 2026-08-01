@@ -1,0 +1,3631 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2E2266">
+<title>Keluang</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel='stylesheet' href='https://cdn-uicons.flaticon.com/4.0.0/uicons-solid-straight/css/uicons-solid-straight.css'>
+<link rel='stylesheet' href='https://cdn-uicons.flaticon.com/4.0.0/uicons-solid-rounded/css/uicons-solid-rounded.css'>
+<link rel='stylesheet' href='https://cdn-uicons.flaticon.com/4.0.0/uicons-bold-rounded/css/uicons-bold-rounded.css'>
+<link rel='stylesheet' href='https://cdn-uicons.flaticon.com/4.0.0/uicons-solid-chubby/css/uicons-solid-chubby.css'>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<script>
+  // Cegah "flash" tampilan Beranda sebelum keputusan onboarding dibuat.
+  // Dijalankan sinkron sebelum konten lain dirender.
+  // CATATAN: ini satu-satunya pengecualian yang disengaja terhadap aturan
+  // "hanya storage.js yang boleh akses localStorage" — karena script ini
+  // wajib jalan sebelum data/storage.js sempat dimuat.
+  (function() {
+    try {
+      var raw = localStorage.getItem('keluangSources');
+      var hasData = raw && JSON.parse(raw).length > 0;
+      if (!hasData) document.documentElement.classList.add('onb-pending');
+    } catch (e) {}
+  })();
+
+  // ======================================================
+  // GLOBAL ERROR HANDLER
+  // ======================================================
+  // Ditaruh paling awal (sebelum script lain dimuat) supaya error apa pun,
+  // termasuk yang terjadi saat load awal, tetap tertangkap. Tujuannya cuma
+  // diagnostik: bikin error tak terduga terlihat jelas di console, dan
+  // kasih pemberitahuan halus ke user kalau showToast sudah tersedia,
+  // alih-alih aplikasi diam-diam "macet" tanpa jejak apa pun.
+  window.addEventListener('error', function(e) {
+    console.error('[Keluang] Uncaught error:', e.error || e.message, e);
+    if (typeof showToast === 'function') {
+      showToast('Terjadi kesalahan tak terduga. Coba ulangi, atau reset aplikasi lewat Pengaturan kalau berlanjut.');
+    }
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    console.error('[Keluang] Unhandled promise rejection:', e.reason, e);
+  });
+</script>
+
+<div id="appShell">
+
+  <!-- ====================================================== -->
+  <!-- PAGE: BERANDA                                           -->
+  <!-- ====================================================== -->
+  <div class="page active" id="page-beranda">
+    <!-- ===== HERO / HEADER ===== -->
+    <div class="hero-wrap">
+      <div class="topbar">
+        <div class="topbar-left">
+          <div class="avatar" id="berandaAvatar">A</div>
+          <div>
+            <div class="topbar-greet">Selamat siang,</div>
+            <div class="topbar-name">Halo 👋</div>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <div class="icon-btn" onclick="toggleNotifPanel(event)">
+            <i class="bi bi-bell"></i>
+            <span class="notif-badge-dot"></span>
+          </div>
+          <div class="icon-btn" onclick="goTo('pengaturan')">
+            <i class="bi bi-gear-fill"></i>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:10px; margin-top:20px; position:relative; z-index:1;">
+        <div class="hero-toggle hero-toggle-3" style="margin-top:0;">
+          <div class="hero-toggle-item active" id="toggleTersedia" onclick="setHeroMode('tersedia')">Tersedia</div>
+          <div class="hero-toggle-item" id="toggleNetWorth" onclick="setHeroMode('networth')">Net Worth</div>
+          <div class="hero-toggle-item" id="toggleLiabilitas" onclick="setHeroMode('liabilitas')">Liabilitas</div>
+        </div>
+        <button class="eye-btn" onclick="openRincianSheet(event)" style="opacity:0.75; padding:4px;" title="Lihat Rincian">
+          <i class="bi bi-info-circle" style="font-size:18px; color:#fff; display:block;"></i>
+        </button>
+      </div>
+
+      <div class="hero-amount-row">
+        <div class="hero-amount" id="heroAmount"><sup>Rp</sup><span id="heroAmountVal">3.450.000</span></div>
+        <button class="eye-btn" onclick="toggleEye()">
+          <i class="bi bi-eye" id="eyeIcon"></i>
+        </button>
+      </div>
+
+      <div class="hero-flow">
+        <div class="hero-flow-item">
+          <div class="hero-flow-icon"><i class="bi bi-arrow-down-left"></i></div>
+          <div class="hero-flow-text-wrap">
+            <span class="hero-flow-caption">Masuk</span>
+            <span class="hero-flow-text" id="heroMasukVal">0</span>
+          </div>
+        </div>
+        <div class="hero-flow-divider"></div>
+        <div class="hero-flow-item">
+          <div class="hero-flow-icon"><i class="bi bi-arrow-up-right"></i></div>
+          <div class="hero-flow-text-wrap">
+            <span class="hero-flow-caption">Keluar</span>
+            <span class="hero-flow-text" id="heroKeluarVal">0</span>
+          </div>
+        </div>
+        <div class="hero-period" onclick="togglePeriodPanel(event)">
+          <span id="periodLabel">Bulan ini</span>
+          <i class="bi bi-chevron-down"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PERIOD PANEL ===== -->
+    <div class="period-panel" id="periodPanel">
+      <div class="period-option" data-val="Minggu ini" onclick="selectPeriod('Minggu ini')">Minggu ini</div>
+      <div class="period-option active" data-val="Bulan ini" onclick="selectPeriod('Bulan ini')">Bulan ini</div>
+      <div class="period-option" data-val="Tahun ini" onclick="selectPeriod('Tahun ini')">Tahun ini</div>
+    </div>
+
+    <!-- ===== SCROLL CONTENT ===== -->
+    <div class="scroll-content">
+      <!-- INSIGHT CAROUSEL -->
+      <div class="insight-carousel-wrap" id="insightCarouselWrap" style="display:none;">
+        <div class="insight-carousel" id="insightCarousel"></div>
+        <div class="insight-dots" id="insightDots"></div>
+      </div>
+
+      <!-- SHORTCUT -->
+      <div class="section-head" style="margin-bottom:12px;">
+        <div class="section-label" style="margin-bottom:0;">Fitur</div>
+        <div class="section-link" id="aturUrutanLink" onclick="toggleHomeEditMode()">Atur Urutan</div>
+      </div>
+      <div class="shortcut-panel shortcut-card">
+        <div class="shortcut-grid" id="shortcutGrid"></div>
+      </div>
+
+      <!-- TRANSAKSI TERBARU -->
+      <div class="section-head">
+        <div class="section-label" style="margin-bottom:0;">Transaksi Terbaru</div>
+        <div class="section-link" onclick="goTo('riwayat')">Lihat semua</div>
+      </div>
+      <div class="tx-list" id="txList"></div>
+      <div class="kt-empty" id="txEmptyState" style="display:none;">Belum ada transaksi tercatat</div>
+    </div>
+
+    <!-- ===== BOTTOM NAV ===== -->
+    <div class="navbar">
+      <div class="nav-item active">
+        <i class="fi fi-sr-home"></i>
+        <span>Beranda</span>
+      </div>
+      <div class="nav-item" onclick="goTo('kantong')">
+        <i class="fi fi-sr-wallet-buyer"></i>
+        <span>Akun</span>
+      </div>
+      <div style="flex:1"></div>
+      <div class="nav-item" onclick="goTo('statistik')">
+        <i class="fi fi-ss-chart-pie-simple-circle-dollar"></i>
+        <span>Statistik</span>
+      </div>
+      <div class="nav-item" onclick="goTo('riwayat')">
+        <i class="fi fi-ss-receipt"></i>
+        <span>Riwayat</span>
+      </div>
+    </div>
+
+    <!-- ===== FAB ===== -->
+    <div style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 10;">
+      <div class="fab" onclick="openAddTransaction()">
+        <i class="bi bi-plus-lg"></i>
+      </div>
+      <span class="fab-label" style="font-size: 10px; font-weight: 600; color: var(--ink-300);">Tambah Transaksi</span>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: SEMUA FITUR                                      -->
+  <!-- ====================================================== -->
+  <!-- ====================================================== -->
+  <!-- PAGE: PLACEHOLDER                                      -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-placeholder">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="goTo('beranda')">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div>
+          <div class="lp-title" id="placeholderTitle">Fitur</div>
+          <div class="lp-subtitle" id="placeholderSubtitle"></div>
+        </div>
+      </div>
+    </div>
+    <div class="placeholder-body">
+      <div class="placeholder-icon-wrap">
+        <i id="placeholderIcon" class="bi bi-lock" style="color: var(--ink-300);"></i>
+      </div>
+      <div class="placeholder-badge">
+        <i class="bi bi-hammer"></i>
+        <span>Sedang dibangun</span>
+      </div>
+      <div class="placeholder-title" id="placeholderName">Fitur Ini</div>
+      <div class="placeholder-desc" id="placeholderDesc">Kami sedang mengerjakan fitur ini. Pantau terus pembaruan berikutnya!</div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: AKUN                                             -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-kantong">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div>
+          <div class="lp-title">Akun</div>
+          <div class="lp-subtitle">Kelola dan pantau semua akunmu</div>
+        </div>
+      </div>
+      <div class="lp-topbar-right">
+        <div class="icon-btn-sm" onclick="toggleNotifPanel(event)">
+          <i class="bi bi-bell"></i>
+          <span class="notif-badge-dot"></span>
+        </div>
+        <div class="icon-btn-sm" onclick="goTo('pengaturan')">
+          <i class="bi bi-gear-fill"></i>
+        </div>
+      </div>
+    </div>
+    <div class="lp-scroll" style="padding-top:16px;">
+
+      <!-- CARD: tab + ringkasan + pie -->
+      <div class="acc-main-card">
+        <div class="acc-tabs">
+          <div class="acc-tab active" data-filter="semua" onclick="setAccFilter('semua')"><i class="bi bi-grid-fill"></i> Semua</div>
+          <div class="acc-tab" data-filter="tunai" onclick="setAccFilter('tunai')"><i class="fi fi-ss-money-bill-wave"></i> Cash</div>
+          <div class="acc-tab" data-filter="rekening" onclick="setAccFilter('rekening')"><i class="fi fi-sr-bank"></i> Bank</div>
+          <div class="acc-tab" data-filter="ewallet" onclick="setAccFilter('ewallet')"><i class="fi fi-sc-wallet"></i> E-Wallet</div>
+          <div class="acc-tab" data-filter="invest" onclick="setAccFilter('invest')"><i class="fi fi-br-growth-chart-invest"></i> Investasi</div>
+        </div>
+        <div class="acc-summary-row">
+          <div class="acc-summary-left">
+            <span class="acc-summary-label" id="accSummaryLabel">Total di Semua Akun</span>
+            <div class="acc-summary-amount" id="accSummaryTotal">Rp0</div>
+            <div class="acc-summary-trend" id="accSummaryTrend"></div>
+          </div>
+          <div class="acc-pie-wrap" id="accPieWrap"></div>
+          <div class="acc-legend-side" id="accLegend"></div>
+        </div>
+      </div>
+
+      <!-- LIST AKUN -->
+      <div class="acc-list-section" id="accListSection">
+        <div class="acc-list-head">
+          <span class="acc-list-title">Daftar Akun</span>
+          <button class="acc-sort-btn" id="accSortBtn" onclick="toggleAccSortMode()">
+            <i class="bi bi-list-ul"></i> Urutkan
+          </button>
+        </div>
+        <div id="accList"></div>
+        <div class="kt-empty" id="accEmptyState" style="display:none; border:none; border-radius:0; margin:0;">Belum ada akun pada kategori ini</div>
+      </div>
+
+      <!-- TAMBAH AKUN -->
+      <button class="kt-add-btn" onclick="openAccountTypeChooser()" style="margin-top:10px;">
+        <i class="bi bi-plus-lg"></i> Tambah Akun
+      </button>
+
+      <div class="kt-info-note" style="margin-top:14px;">
+        <i class="bi bi-info-circle"></i>
+        <span>Dana Liquid (Cash, Bank, E-Wallet) digunakan untuk transaksi harian. Investasi dipisah agar Uang Tersedia tetap akurat.</span>
+      </div>
+
+    </div>
+    <div class="navbar">
+      <div class="nav-item" onclick="goTo('beranda')">
+        <i class="fi fi-sr-home"></i>
+        <span>Beranda</span>
+      </div>
+      <div class="nav-item active">
+        <i class="fi fi-sr-wallet-buyer"></i>
+        <span>Akun</span>
+      </div>
+      <div style="flex:1"></div>
+      <div class="nav-item" onclick="goTo('statistik')">
+        <i class="fi fi-ss-chart-pie-simple-circle-dollar"></i>
+        <span>Statistik</span>
+      </div>
+      <div class="nav-item" onclick="goTo('riwayat')">
+        <i class="fi fi-ss-receipt"></i>
+        <span>Riwayat</span>
+      </div>
+    </div>
+    <div style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 10;">
+      <div class="fab" onclick="openAddTransaction()">
+        <i class="bi bi-plus-lg"></i>
+      </div>
+      <span class="fab-label" style="font-size: 10px; font-weight: 600; color: var(--ink-300);">Tambah Transaksi</span>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: BUDGET                                           -->
+  <!-- ====================================================== -->
+  <!-- PAGE: BUDGET                                           -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-budget">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="goTo('beranda')">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div>
+          <div class="lp-title">Budget</div>
+          <div class="lp-subtitle">Rencanakan pengeluaran</div>
+        </div>
+      </div>
+      <div class="lp-topbar-right">
+        <div class="icon-btn-sm" id="budgetTopbarSearchBtn" onclick="toggleBudgetSearch()"><i class="bi bi-search"></i></div>
+      </div>
+    </div>
+
+  <!-- Nav Bulan + Search — copy st-nav-row dari Statistik -->
+    <div class="lp-scroll" style="padding-top:16px;">
+      <div class="st-nav-row" id="budgetNavRow" style="margin-bottom:12px;">
+        <button class="st-nav-btn" onclick="budgetPrevMonth()"><i class="bi bi-chevron-left"></i></button>
+        <span class="st-nav-label st-nav-label-clickable" id="budgetMonthLabel" onclick="openBudgetMonthPicker()">
+          Juli 2026 <i class="bi bi-chevron-down" style="font-size:10px; margin-left:4px;"></i>
+        </span>
+        <button class="st-nav-btn" onclick="budgetNextMonth()"><i class="bi bi-chevron-right"></i></button>
+      </div>
+
+      <!-- Search inline — filter langsung, tidak butuh sheet -->
+      <div id="budgetSearchRow" style="display:none; margin-bottom:12px;">
+        <input class="input" id="budgetSearchInput" placeholder="Cari kategori..."
+               oninput="renderBudgetPage()"
+               onkeydown="if(event.key==='Enter')this.blur()"
+               enterkeyhint="done"
+               style="margin-bottom:0;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+
+      <div id="budgetHero" style="margin-bottom:12px;"></div>
+      <div id="budgetList"></div>
+
+      <button class="kt-add-btn" id="budgetAddBtn" onclick="openBudgetForm(null)" style="margin-top:12px;">
+        <i class="bi bi-plus-lg"></i> Buat Budget
+      </button>
+
+      <div class="kt-info-note" id="budgetInfoNote" style="margin-top:14px;">
+        <i class="bi bi-info-circle"></i>
+        <span>Budget dengan "Ulangi" aktif akan otomatis muncul di bulan berikutnya.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: BUDGET DETAIL                                    -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-budget-detail">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="goTo('budget')">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div class="lp-title" id="budgetDetailTitle">Detail Budget</div>
+      </div>
+      <div class="lp-topbar-right">
+        <button class="icon-btn-sm" onclick="openBudgetFormFromDetail()">
+          <i class="bi bi-pencil"></i>
+        </button>
+      </div>
+    </div>
+    <div class="lp-scroll" id="budgetDetailContent" style="padding-top:16px;"></div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: WISHLIST                                         -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-wishlist">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="goTo('beranda')">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div>
+          <div class="lp-title">Wishlist</div>
+          <div class="lp-subtitle">Rencanakan impianmu</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lp-scroll" style="padding-top:16px; position:relative;">
+      <!-- Ringkasan (hero) -->
+      <div id="wlHero" style="margin-bottom:14px;"></div>
+
+      <!-- Search + Filter + Toggle View -->
+      <div class="wl-search-row" id="wlSearchRow">
+        <div class="wl-search-bar">
+          <input class="input" id="wlSearchInput" placeholder="Cari nama wishlist..."
+                 oninput="filterWishlistSearch()"
+                 onkeydown="if(event.key==='Enter')this.blur()"
+                 enterkeyhint="done" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <button class="wl-search-filter-btn" id="wlFilterBtn" onclick="openWlFilterSheet()">
+            <i class="bi bi-funnel"></i>
+            <span class="rw-filter-badge" id="wlFilterBadge" style="display:none;"></span>
+          </button>
+        </div>
+        <button class="icon-btn-sm wl-view-toggle-btn" id="wlViewToggleBtn" onclick="toggleWlViewMode()">
+          <i class="bi bi-grid-3x3-gap-fill" id="wlViewToggleIcon"></i>
+        </button>
+      </div>
+
+      <!-- Toggle status -->
+      <div class="type-seg" id="wlTabRow" style="margin-bottom:10px;">
+        <div class="type-seg-item wl-tab active" data-tab="berlangsung" onclick="setWlStatusTab('berlangsung')">Berlangsung</div>
+        <div class="type-seg-item wl-tab" data-tab="tercapai" onclick="setWlStatusTab('tercapai')">Tercapai</div>
+        <div class="type-seg-item wl-tab" data-tab="selesai" onclick="setWlStatusTab('selesai')">Selesai</div>
+      </div>
+
+      <!-- Chip filter aktif -->
+      <div id="wlActiveChips" class="rw-active-chips" style="display:none;"></div>
+
+      <!-- List -->
+      <div id="wlList" class="wl-list"></div>
+
+      <!-- Empty state -->
+      <div class="bdg-empty" id="wlEmptyState" style="display:none;">
+        <i class="bi bi-hourglass-split"></i>
+        <div class="bdg-empty-title">Belum Ada Wishlist Berjalan</div>
+        <div class="bdg-empty-sub">Tap "Tambah Wishlist" di bawah untuk mulai merencanakan wishlist impianmu.</div>
+      </div>
+
+      <button class="kt-add-btn" id="wlAddBtn" onclick="openWishlistForm(null)" style="margin-top:12px;">
+        <i class="bi bi-plus-lg"></i> Tambah Wishlist
+      </button>
+
+      <div style="height:80px;"></div>
+    </div>
+  </div>
+
+  <!-- FILTER SHEET: WISHLIST (Kategori + Prioritas) -->
+  <div class="sheet-overlay" id="wlFilterOverlay" onclick="if(event.target===this) closeWlFilterSheet()">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div class="sheet-title">Filter Wishlist</div>
+        <button class="sheet-close" onclick="closeWlFilterSheet()"><i class="bi bi-x-lg"></i></button>
+      </div>
+
+      <div class="rw-fs-section">
+        <div class="rw-fs-title">Kategori</div>
+        <div class="rw-chip-wrap" id="wlfCatChips"></div>
+      </div>
+
+      <div class="rw-fs-section">
+        <div class="rw-fs-title">Prioritas</div>
+        <div class="rw-chip-wrap" id="wlfPriorityChips"></div>
+      </div>
+
+      <div class="rw-fs-actions">
+        <button class="rw-fs-reset-btn" onclick="resetWlFilter()">Reset</button>
+        <button class="rw-fs-apply-btn" onclick="applyWlFilter()">Terapkan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: TAMBAH / EDIT WISHLIST (full-screen)             -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-wishlist-form">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="closeWishlistForm()">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div class="lp-title" id="wlFormTitle">Tambah Wishlist</div>
+      </div>
+    </div>
+
+    <div class="lp-scroll" style="padding-top:16px;">
+
+      <!-- Foto -->
+      <div class="field">
+        <label class="field-label">Foto Wishlist (Opsional)</label>
+        <input type="file" id="wlPhotoInput" accept="image/*" style="display:none;" onchange="handleWlPhotoUpload(this.files[0])" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <div class="wl-photo-box" id="wlPhotoBox" onclick="document.getElementById('wlPhotoInput').click()">
+          <i class="bi bi-camera-fill"></i>
+          <div class="wl-photo-box-text">Tambah Foto</div>
+          <div class="wl-photo-box-sub">JPG, PNG, maks 8MB</div>
+        </div>
+        <div class="wl-photo-preview" id="wlPhotoPreview" style="display:none;">
+          <img id="wlPhotoPreviewImg" src="" alt="">
+          <button class="wl-photo-edit" onclick="editWlPhoto(event)"><i class="bi bi-crop"></i></button>
+          <button class="wl-photo-remove" onclick="removeWlPhoto(event)"><i class="bi bi-trash3"></i></button>
+        </div>
+      </div>
+
+      <!-- Nama -->
+      <div class="field">
+        <label class="field-label">Nama Wishlist</label>
+        <input class="input" id="wlNameInput" placeholder="cth. iPhone 17 Air, Liburan Jepang" maxlength="40"
+               enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+
+      <!-- Kategori & Prioritas -->
+      <div class="field-row" style="margin-bottom:18px;">
+        <div class="field" style="margin-bottom:0;">
+          <label class="field-label">Kategori</label>
+          <div class="field-card placeholder" id="wlCategoryCard" onclick="wlFormOpenCategoryPicker()">
+            <div class="field-card-icon-mono" id="wlCategoryIconWrap"><i class="bi bi-grid"></i></div>
+            <div class="field-card-body"><div class="field-card-title" id="wlCategoryLabel">Pilih kategori</div></div>
+            <i class="bi bi-chevron-right field-card-chevron"></i>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label class="field-label">Prioritas</label>
+          <div class="field-card placeholder" id="wlPriorityCard" onclick="wlFormOpenPriorityPicker()">
+            <div class="field-card-icon-mono" id="wlPriorityIconWrap"><i class="bi bi-star"></i></div>
+            <div class="field-card-body"><div class="field-card-title" id="wlPriorityLabel">Pilih prioritas</div></div>
+            <i class="bi bi-chevron-right field-card-chevron"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Target Nominal & Tanggal -->
+      <div class="field-row" style="margin-bottom:18px;">
+        <div class="field" style="margin-bottom:0;">
+          <label class="field-label">Target Nominal</label>
+          <div class="input input-row-box" style="padding-left:14px;">
+            <span class="input-prefix">Rp</span>
+            <input class="input-amount" id="wlTargetInput" type="text" inputmode="numeric" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                   style="border:none; padding:0; width:100%; background:transparent; font-size:16px; color:var(--ink-900);"
+                   oninput="formatAmountInput(this)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label class="field-label">Target Tanggal</label>
+          <div class="field-card" id="wlTargetDateCard" onclick="wlFormOpenDatePicker()">
+            <div class="field-card-icon" style="background:var(--accent2);"><i class="bi bi-calendar3"></i></div>
+            <div class="field-card-body"><div class="field-card-title" id="wlTargetDateLabel">Pilih tanggal</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tempat Menyimpan Uang -->
+      <div class="field">
+        <label class="field-label">Tempat Menyimpan Uang (Opsional)</label>
+        <input class="input" id="wlStorageInput" placeholder="cth. Tabungan Utama, BCA, Dompet" maxlength="40"
+               enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+
+      <!-- Rencana Pengisian -->
+      <div class="field">
+        <div class="bdg-repeat-row">
+          <div>
+            <div class="bdg-repeat-label">Rencana Pengisian</div>
+            <div class="bdg-repeat-sub">Atur target tabungan berkala (opsional)</div>
+          </div>
+          <label class="bdg-toggle">
+            <input type="checkbox" id="wlPlanToggle" onchange="toggleWlPlanSection()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <span class="bdg-toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div id="wlPlanSection" style="display:none;">
+        <div class="type-seg" style="margin-bottom:14px;">
+          <div class="type-seg-item wl-plan-tab active" data-type="harian" onclick="setWlPlanType('harian')">Harian</div>
+          <div class="type-seg-item wl-plan-tab" data-type="mingguan" onclick="setWlPlanType('mingguan')">Mingguan</div>
+          <div class="type-seg-item wl-plan-tab" data-type="bulanan" onclick="setWlPlanType('bulanan')">Bulanan</div>
+        </div>
+        <div class="field-row" style="align-items:flex-end;">
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label">Nominal per Periode</label>
+            <div class="input input-row-box" style="padding-left:14px;">
+              <span class="input-prefix">Rp</span>
+              <input class="input-amount" id="wlPlanAmountInput" type="text" inputmode="numeric" placeholder="0"
+                     enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                     style="border:none; padding:0; width:100%; background:transparent; font-size:16px; color:var(--ink-900);"
+                     oninput="formatAmountInput(this)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0; flex:0 0 auto;">
+            <button class="kt-add-btn" style="white-space:nowrap;" onclick="openWlCalculator()">
+              <i class="bi bi-calculator"></i> Kalkulator
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Catatan -->
+      <div class="field">
+        <label class="field-label">Catatan (Opsional)</label>
+        <textarea class="input" id="wlNoteInput" rows="3" maxlength="150"
+                  placeholder="Kenapa wishlist ini penting buatmu?"
+                  oninput="document.getElementById('wlNoteCounter').textContent = this.value.length + '/150'"
+                  style="resize:none; height:auto;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+        <div style="text-align:right; font-size:10.5px; color:var(--ink-300); margin-top:4px;" id="wlNoteCounter">0/150</div>
+      </div>
+
+      <div class="info-banner">
+        <i class="bi bi-info-circle"></i>
+        <div class="info-banner-text">Wishlist adalah kantong mandiri. Uang di wishlist tidak akan tercampur dengan kantong/akun manapun.</div>
+      </div>
+
+      <div id="wlFormErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+
+      <button class="btn btn-primary" onclick="saveWishlistForm()">Simpan Wishlist</button>
+
+      <div style="height:40px;"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: WISHLIST FORM — KATEGORI PICKER -->
+  <div class="sheet-overlay" id="wlFormCategoryPickerOverlay" onclick="if(event.target===this)closeSheet('wlFormCategoryPickerOverlay')">
+    <div class="sheet" style="max-height:60vh;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Pilih Kategori</span>
+        <button class="sheet-close" onclick="closeSheet('wlFormCategoryPickerOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="picker-list" id="wlFormCategoryList"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: WISHLIST FORM — PRIORITAS PICKER -->
+  <div class="sheet-overlay" id="wlFormPriorityPickerOverlay" onclick="if(event.target===this)closeSheet('wlFormPriorityPickerOverlay')">
+    <div class="sheet" style="max-height:50vh;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Pilih Prioritas</span>
+        <button class="sheet-close" onclick="closeSheet('wlFormPriorityPickerOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="picker-list" id="wlFormPriorityList"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: KALKULATOR TARGET -->
+  <div class="sheet-overlay" id="wlCalculatorOverlay" onclick="if(event.target===this)closeSheet('wlCalculatorOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Kalkulator Target</span>
+        <button class="sheet-close" onclick="closeSheet('wlCalculatorOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="field">
+          <label class="field-label">Nominal Target</label>
+          <div class="input input-row-box" style="padding-left:14px;">
+            <span class="input-prefix">Rp</span>
+            <input class="input-amount" id="wlCalcNominalInput" type="text" inputmode="numeric" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                   style="border:none; padding:0; width:100%; background:transparent; font-size:16px; color:var(--ink-900);"
+                   oninput="formatAmountInput(this)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">Tanggal Tercapai</label>
+          <div class="field-card" onclick="wlCalcOpenDatePicker()">
+            <div class="field-card-icon" style="background:var(--accent2);"><i class="bi bi-calendar3"></i></div>
+            <div class="field-card-body"><div class="field-card-title" id="wlCalcDateLabel">Pilih tanggal</div></div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="hitungWlRencana()">Hitung Rencana Pengisian</button>
+
+        <div id="wlCalcResultWrap" style="display:none; margin-top:22px;">
+          <div style="font-size:11.5px; font-weight:700; color:var(--ink-500); margin-bottom:12px;" id="wlCalcSummaryLabel"></div>
+          <div id="wlCalcResultList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: DETAIL WISHLIST                                  -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-wishlist-detail">
+    <div class="lp-scroll" style="padding:0 0 32px;">
+      <div class="wl-detail-hero" id="wlDetailHero"></div>
+      <div class="wl-detail-body" id="wlDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: PENGATURAN WISHLIST -->
+  <div class="sheet-overlay" id="wlSettingsOverlay" onclick="if(event.target===this)closeSheet('wlSettingsOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Pengaturan Wishlist</span>
+        <button class="sheet-close" onclick="closeSheet('wlSettingsOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;" id="wlSettingsBody"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: SETOR DANA -->
+  <div class="sheet-overlay" id="wlSetorOverlay" onclick="if(event.target===this)closeSheet('wlSetorOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Setor Dana</span>
+        <button class="sheet-close" onclick="closeSheet('wlSetorOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="rw-summary-row">
+          <div class="rw-summary-card"><div class="rsc-label">Saldo Saat Ini</div><div class="rsc-val" id="wlSetorSaldoLabel">Rp0</div></div>
+          <div class="rw-summary-card"><div class="rsc-label">Sisa Target</div><div class="rsc-val" id="wlSetorSisaLabel">Rp0</div></div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Nominal Setor</label>
+          <div class="input input-row-box" style="padding-left:14px;">
+            <span class="input-prefix">Rp</span>
+            <input class="input-amount" id="wlSetorAmountInput" type="text" inputmode="numeric" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                   style="border:none; padding:0; width:100%; background:transparent; color:var(--ink-900);"
+                   oninput="formatAmountInput(this); renderWlSetorSummary();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+          <div class="quick-amount-row" id="wlSetorQuickRow" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"></div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">Dari Akun</label>
+            <div class="field-card placeholder" id="wlSetorAccountCard" onclick="wlOpenAccountPicker('setor')">
+              <div class="field-card-icon-mono" id="wlSetorAccountIconWrap"><i class="bi bi-wallet2"></i></div>
+              <div class="field-card-body">
+                <div class="field-card-title" id="wlSetorAccountLabel">Pilih akun</div>
+                <div class="field-card-sub" id="wlSetorAccountSub" style="display:none;"></div>
+              </div>
+              <i class="bi bi-chevron-right field-card-chevron"></i>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Biaya Admin (Opsional)</label>
+            <div class="input input-row-box" style="padding-left:14px;">
+              <span class="input-prefix">Rp</span>
+              <input class="input-amount" id="wlSetorFeeInput" type="text" inputmode="numeric" placeholder="0"
+                     enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                     style="border:none; padding:0; width:100%; background:transparent; font-size:15px; color:var(--ink-900);"
+                     oninput="formatAmountInput(this); renderWlSetorSummary();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Catatan (Opsional)</label>
+          <input class="input" id="wlSetorNoteInput" placeholder="Tulis catatan..." maxlength="100"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <div class="wl-info-card" id="wlSetorSummaryCard"></div>
+
+        <div id="wlSetorErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+        <button class="btn btn-primary" onclick="submitWlSetor()">Setor Sekarang</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: TARIK DANA -->
+  <div class="sheet-overlay" id="wlTarikOverlay" onclick="if(event.target===this)closeSheet('wlTarikOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Tarik Dana</span>
+        <button class="sheet-close" onclick="closeSheet('wlTarikOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="rw-summary-row">
+          <div class="rw-summary-card"><div class="rsc-label">Saldo Saat Ini</div><div class="rsc-val" id="wlTarikSaldoLabel">Rp0</div></div>
+          <div class="rw-summary-card"><div class="rsc-label">Sisa Target</div><div class="rsc-val" id="wlTarikSisaLabel">Rp0</div></div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Nominal Tarik</label>
+          <div class="input input-row-box" style="padding-left:14px;">
+            <span class="input-prefix">Rp</span>
+            <input class="input-amount" id="wlTarikAmountInput" type="text" inputmode="numeric" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                   style="border:none; padding:0; width:100%; background:transparent; color:var(--ink-900);"
+                   oninput="formatAmountInput(this); renderWlTarikSummary();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+          <div class="quick-amount-row" id="wlTarikQuickRow" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"></div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">Ke Akun</label>
+            <div class="field-card placeholder" id="wlTarikAccountCard" onclick="wlOpenAccountPicker('tarik')">
+              <div class="field-card-icon-mono" id="wlTarikAccountIconWrap"><i class="bi bi-wallet2"></i></div>
+              <div class="field-card-body">
+                <div class="field-card-title" id="wlTarikAccountLabel">Pilih akun</div>
+                <div class="field-card-sub" id="wlTarikAccountSub" style="display:none;"></div>
+              </div>
+              <i class="bi bi-chevron-right field-card-chevron"></i>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Biaya Admin (Opsional)</label>
+            <div class="input input-row-box" style="padding-left:14px;">
+              <span class="input-prefix">Rp</span>
+              <input class="input-amount" id="wlTarikFeeInput" type="text" inputmode="numeric" placeholder="0"
+                     enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                     style="border:none; padding:0; width:100%; background:transparent; font-size:15px; color:var(--ink-900);"
+                     oninput="formatAmountInput(this); renderWlTarikSummary();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Catatan (Opsional)</label>
+          <input class="input" id="wlTarikNoteInput" placeholder="Tulis catatan..." maxlength="100"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <div class="wl-info-card" id="wlTarikSummaryCard"></div>
+
+        <div id="wlTarikErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+        <button class="btn btn-primary" onclick="submitWlTarik()">Tarik Sekarang</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: GUNAKAN DANA -->
+  <div class="sheet-overlay" id="wlGunakanOverlay" onclick="if(event.target===this)closeSheet('wlGunakanOverlay')">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Gunakan Dana</span>
+        <button class="sheet-close" onclick="closeSheet('wlGunakanOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px;">
+        <div class="wl-info-card" id="wlGunakanInfoCard"></div>
+
+        <div class="field">
+          <label class="field-label">Catatan (Opsional)</label>
+          <input class="input" id="wlGunakanNoteInput" placeholder="cth. Sudah dibeli di iBox" maxlength="100"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <div class="info-banner danger-banner">
+          <i class="bi bi-exclamation-triangle"></i>
+          <div class="info-banner-text">Setelah ini, wishlist ditandai Selesai dan dananya dicatat sebagai pengeluaran. Tindakan ini tidak bisa dibatalkan.</div>
+        </div>
+
+        <button class="btn btn-primary" onclick="submitWlGunakanDana()">Gunakan Dana Sekarang</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: HAPUS WISHLIST (saldo > 0) -->
+  <div class="sheet-overlay" id="wlHapusOverlay" onclick="if(event.target===this)closeSheet('wlHapusOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Hapus Wishlist</span>
+        <button class="sheet-close" onclick="closeSheet('wlHapusOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="info-banner danger-banner">
+          <i class="bi bi-exclamation-triangle"></i>
+          <div class="info-banner-text">Wishlist tidak dapat dihapus karena masih memiliki saldo. Pindahkan dana ke akun lain terlebih dahulu untuk menghapus wishlist ini.</div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Pindahkan Dana Ke</label>
+          <div class="field-card placeholder" id="wlHapusAccountCard" onclick="wlOpenAccountPicker('hapus')">
+            <div class="field-card-icon-mono" id="wlHapusAccountIconWrap"><i class="bi bi-wallet2"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="wlHapusAccountLabel">Pilih akun</div>
+              <div class="field-card-sub" id="wlHapusAccountSub" style="display:none;"></div>
+            </div>
+            <i class="bi bi-chevron-right field-card-chevron"></i>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Biaya Admin (Opsional)</label>
+          <div class="input input-row-box" style="padding-left:14px;">
+            <span class="input-prefix">Rp</span>
+            <input class="input-amount" id="wlHapusFeeInput" type="text" inputmode="numeric" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                   style="border:none; padding:0; width:100%; background:transparent; font-size:15px; color:var(--ink-900);"
+                   oninput="formatAmountInput(this); renderWlHapusSummary();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+
+        <div class="wl-info-card" id="wlHapusSummaryCard"></div>
+
+        <div id="wlHapusErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+        <button class="btn" style="background:var(--danger-100); color:var(--danger);" onclick="submitWlHapus()">
+          <i class="bi bi-trash3"></i> Pindahkan Dana &amp; Hapus Wishlist
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: PILIH AKUN (dipakai Setor/Tarik/Hapus) -->
+  <div class="sheet-overlay" id="wlAccountPickerOverlay" onclick="if(event.target===this)closeSheet('wlAccountPickerOverlay')">
+    <div class="sheet" style="max-height:60vh;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Pilih Akun</span>
+        <button class="sheet-close" onclick="closeSheet('wlAccountPickerOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="picker-list" id="wlAccountList"></div>
+    </div>
+  </div>
+
+  <!-- OVERLAY: CROP FOTO WISHLIST -->
+  <div class="wl-crop-overlay" id="wlCropOverlay">
+    <div class="wl-crop-topbar">
+      <button class="wl-crop-topbar-btn" onclick="cancelWlCrop()"><i class="bi bi-x-lg"></i></button>
+      <div class="wl-crop-title">Sesuaikan Foto</div>
+      <button class="wl-crop-topbar-btn wl-crop-confirm" onclick="confirmWlCrop()"><i class="bi bi-check-lg"></i></button>
+    </div>
+    <div class="type-seg wl-crop-aspect-seg">
+      <div class="type-seg-item wl-crop-aspect-tab" data-ratio="1" onclick="setWlCropAspect('1',this)">1:1</div>
+      <div class="type-seg-item wl-crop-aspect-tab active" data-ratio="0.75" onclick="setWlCropAspect('0.75',this)">3:4</div>
+      <div class="type-seg-item wl-crop-aspect-tab" data-ratio="1.3333" onclick="setWlCropAspect('1.3333',this)">4:3</div>
+    </div>
+    <div class="wl-crop-stage">
+      <img id="wlCropImage" src="" alt="">
+    </div>
+    <div class="wl-crop-hint">Geser untuk atur posisi, cubit/scroll untuk zoom</div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: DANA DARURAT                                     -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-darurat">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="goTo('beranda')">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div>
+          <div class="lp-title">Dana Darurat</div>
+          <div class="lp-subtitle">Sisihkan dana cadangan</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lp-scroll" style="padding-top:16px;">
+      <div id="ddBody"></div>
+      <div style="height:60px;"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: DANA DARURAT — SETUP / EDIT TARGET -->
+  <div class="sheet-overlay" id="ddSetupOverlay" onclick="if(event.target===this)closeSheet('ddSetupOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title" id="ddSetupTitle">Atur Dana Darurat</span>
+        <button class="sheet-close" onclick="closeSheet('ddSetupOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="field">
+          <label class="field-label">Target Nominal</label>
+          <div class="input input-row-box" style="padding-left:14px;">
+            <span class="input-prefix">Rp</span>
+            <input class="input-amount" id="ddSetupTargetInput" type="text" inputmode="numeric" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                   style="border:none; padding:0; width:100%; background:transparent; font-size:16px; color:var(--ink-900);"
+                   oninput="formatAmountInput(this)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+        <div class="field">
+          <button class="kt-add-btn" style="white-space:nowrap;" onclick="openDdCalculator()">
+            <i class="bi bi-calculator"></i> Kalkulator Rekomendasi Target
+          </button>
+        </div>
+        <div class="field">
+          <label class="field-label">Tempat Menyimpan Uang (Opsional)</label>
+          <input class="input" id="ddSetupStorageInput" placeholder="cth. Tabungan Terpisah, BCA, Deposito" maxlength="40"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label class="field-label">Catatan (Opsional)</label>
+          <textarea class="input" id="ddSetupNoteInput" rows="3" maxlength="150"
+                    placeholder="cth. Untuk kondisi kehilangan pekerjaan atau sakit mendadak"
+                    style="resize:none; height:auto;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+        </div>
+        <div class="info-banner">
+          <i class="bi bi-info-circle"></i>
+          <div class="info-banner-text">Dana Darurat adalah kantong mandiri. Uang di dalamnya tidak akan tercampur dengan akun manapun.</div>
+        </div>
+        <div id="ddSetupErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+        <button class="btn btn-primary" onclick="saveDdSetup()">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: DANA DARURAT — KALKULATOR REKOMENDASI TARGET -->
+  <div class="sheet-overlay" id="ddCalculatorOverlay" onclick="if(event.target===this)closeSheet('ddCalculatorOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Kalkulator Rekomendasi Target</span>
+        <button class="sheet-close" onclick="closeSheet('ddCalculatorOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="field">
+          <label class="field-label">Pengeluaran Bulanan (Manual)</label>
+          <div class="input input-row-box" style="padding-left:14px;">
+            <span class="input-prefix">Rp</span>
+            <input class="input-amount" id="ddCalcExpenseInput" type="text" inputmode="numeric" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                   style="border:none; padding:0; width:100%; background:transparent; font-size:16px; color:var(--ink-900);"
+                   oninput="formatAmountInput(this)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+          <div style="font-size:10.5px; color:var(--ink-300); margin-top:6px;">Isi manual sesuai perkiraanmu sendiri — pengeluaran bulanan biasanya gak menentu, jadi lebih akurat kalau kamu yang tentuin.</div>
+        </div>
+        <button class="btn btn-primary" onclick="hitungDdRekomendasi()">Hitung Rekomendasi</button>
+
+        <div id="ddCalcResultWrap" style="margin-top:20px;">
+          <div id="ddCalcResultList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: DANA DARURAT — SETOR DANA -->
+  <div class="sheet-overlay" id="ddSetorOverlay" onclick="if(event.target===this)closeSheet('ddSetorOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Setor Dana Darurat</span>
+        <button class="sheet-close" onclick="closeSheet('ddSetorOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="bdg-hero-row" style="margin-bottom:14px;">
+          <div class="bdg-hero-item">
+            <div class="bdg-hero-label">Saldo Saat Ini</div>
+            <div class="bdg-hero-val" id="ddSetorSaldoLabel">Rp0</div>
+          </div>
+          <div class="bdg-hero-item right">
+            <div class="bdg-hero-label">Sisa ke Target</div>
+            <div class="bdg-hero-val" id="ddSetorSisaLabel">Rp0</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Nominal Setor</label>
+          <div class="input input-row-box" style="padding-left:14px;">
+            <span class="input-prefix">Rp</span>
+            <input class="input-amount" id="ddSetorAmountInput" type="text" inputmode="numeric" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                   style="border:none; padding:0; width:100%; background:transparent; font-size:16px; color:var(--ink-900);"
+                   oninput="formatAmountInput(this); renderDdSetorSummary();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+          <div class="quick-amount-row" id="ddSetorQuickRow" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"></div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">Dari Akun</label>
+            <div class="field-card placeholder" id="ddSetorAccountCard" onclick="ddOpenAccountPicker('setor')">
+              <div class="field-card-icon-mono" id="ddSetorAccountIconWrap"><i class="bi bi-wallet2"></i></div>
+              <div class="field-card-body">
+                <div class="field-card-title" id="ddSetorAccountLabel">Pilih akun</div>
+                <div class="field-card-sub" id="ddSetorAccountSub" style="display:none;"></div>
+              </div>
+              <i class="bi bi-chevron-right field-card-chevron"></i>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Biaya Admin/Fee (Opsional)</label>
+            <div class="input input-row-box" style="padding-left:14px;">
+              <span class="input-prefix">Rp</span>
+              <input class="input-amount" id="ddSetorFeeInput" type="text" inputmode="numeric" placeholder="0"
+                     enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                     style="border:none; padding:0; width:100%; background:transparent; font-size:16px; color:var(--ink-900);"
+                     oninput="formatAmountInput(this); renderDdSetorSummary();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Catatan (Opsional)</label>
+          <input class="input" id="ddSetorNoteInput" placeholder="cth. Setoran rutin bulanan" maxlength="100"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <div class="wl-info-card" id="ddSetorSummaryCard"></div>
+
+        <div id="ddSetorErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+        <button class="btn btn-primary" onclick="submitDdSetor()">Setor Sekarang</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: DANA DARURAT — PAKAI DANA -->
+  <div class="sheet-overlay" id="ddPakaiOverlay" onclick="if(event.target===this)closeSheet('ddPakaiOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Pakai Dana Darurat</span>
+        <button class="sheet-close" onclick="closeSheet('ddPakaiOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="bdg-hero-row" style="margin-bottom:14px;">
+          <div class="bdg-hero-item">
+            <div class="bdg-hero-label">Saldo Dana Darurat</div>
+            <div class="bdg-hero-val" id="ddPakaiSaldoLabel">Rp0</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Nominal Dipakai</label>
+          <div class="input input-row-box" style="padding-left:14px;">
+            <span class="input-prefix">Rp</span>
+            <input class="input-amount" id="ddPakaiAmountInput" type="text" inputmode="numeric" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                   style="border:none; padding:0; width:100%; background:transparent; font-size:16px; color:var(--ink-900);"
+                   oninput="formatAmountInput(this); renderDdPakaiSummary();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+          <div class="quick-amount-row" id="ddPakaiQuickRow" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"></div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">Ke Akun</label>
+            <div class="field-card placeholder" id="ddPakaiAccountCard" onclick="ddOpenAccountPicker('pakai')">
+              <div class="field-card-icon-mono" id="ddPakaiAccountIconWrap"><i class="bi bi-wallet2"></i></div>
+              <div class="field-card-body">
+                <div class="field-card-title" id="ddPakaiAccountLabel">Pilih akun</div>
+                <div class="field-card-sub" id="ddPakaiAccountSub" style="display:none;"></div>
+              </div>
+              <i class="bi bi-chevron-right field-card-chevron"></i>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Biaya Admin/Fee (Opsional)</label>
+            <div class="input input-row-box" style="padding-left:14px;">
+              <span class="input-prefix">Rp</span>
+              <input class="input-amount" id="ddPakaiFeeInput" type="text" inputmode="numeric" placeholder="0"
+                     enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                     style="border:none; padding:0; width:100%; background:transparent; font-size:16px; color:var(--ink-900);"
+                     oninput="formatAmountInput(this); renderDdPakaiSummary();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Catatan (Opsional)</label>
+          <input class="input" id="ddPakaiNoteInput" placeholder="cth. Biaya berobat mendadak" maxlength="100"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <div class="wl-info-card" id="ddPakaiSummaryCard"></div>
+
+        <div class="info-banner">
+          <i class="bi bi-info-circle"></i>
+          <div class="info-banner-text">Dana akan masuk ke akun tujuan sebagai transfer (netral). Kalau nanti dibelanjakan, catat sebagai transaksi Pengeluaran terpisah seperti biasa.</div>
+        </div>
+
+        <div id="ddPakaiErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+        <button class="btn btn-primary" onclick="submitDdPakai()">Pakai Sekarang</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: DANA DARURAT — PENGATURAN (3-dot) -->
+  <div class="sheet-overlay" id="ddSettingsOverlay" onclick="if(event.target===this)closeSheet('ddSettingsOverlay')">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Pengaturan Dana Darurat</span>
+        <button class="sheet-close" onclick="closeSheet('ddSettingsOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 24px; overflow-y:auto; flex:1;" id="ddSettingsBody"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: DANA DARURAT — HAPUS -->
+  <div class="sheet-overlay" id="ddHapusOverlay" onclick="if(event.target===this)closeSheet('ddHapusOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Hapus Dana Darurat</span>
+        <button class="sheet-close" onclick="closeSheet('ddHapusOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="info-banner danger-banner">
+          <i class="bi bi-exclamation-triangle"></i>
+          <div class="info-banner-text">Sisa saldo akan dipindahkan ke akun pilihanmu, lalu Dana Darurat dihapus permanen.</div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">Pindahkan Sisa Dana Ke</label>
+            <div class="field-card placeholder" id="ddHapusAccountCard" onclick="ddOpenAccountPicker('hapus')">
+              <div class="field-card-icon-mono" id="ddHapusAccountIconWrap"><i class="bi bi-wallet2"></i></div>
+              <div class="field-card-body">
+                <div class="field-card-title" id="ddHapusAccountLabel">Pilih akun</div>
+                <div class="field-card-sub" id="ddHapusAccountSub" style="display:none;"></div>
+              </div>
+              <i class="bi bi-chevron-right field-card-chevron"></i>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Biaya Admin/Fee (Opsional)</label>
+            <div class="input input-row-box" style="padding-left:14px;">
+              <span class="input-prefix">Rp</span>
+              <input class="input-amount" id="ddHapusFeeInput" type="text" inputmode="numeric" placeholder="0"
+                     enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                     style="border:none; padding:0; width:100%; background:transparent; font-size:16px; color:var(--ink-900);"
+                     oninput="formatAmountInput(this); renderDdHapusSummary();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="wl-info-card" id="ddHapusSummaryCard"></div>
+
+        <div id="ddHapusErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+        <button class="btn btn-primary" style="background:var(--danger);" onclick="submitDdHapus()">
+          <i class="bi bi-trash3"></i> Pindahkan Dana &amp; Hapus Dana Darurat
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: DANA DARURAT — PICKER AKUN (setor/pakai/hapus) -->
+  <div class="sheet-overlay" id="ddAccountPickerOverlay" onclick="if(event.target===this)closeSheet('ddAccountPickerOverlay')">
+    <div class="sheet" style="max-height:60vh;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Pilih Akun</span>
+        <button class="sheet-close" onclick="closeSheet('ddAccountPickerOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="picker-list" id="ddAccountList"></div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: UTANG-PIUTANG                                    -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-utang">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="goTo('beranda')">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div>
+          <div class="lp-title">Utang-Piutang</div>
+          <div class="lp-subtitle">Pantau pinjaman &amp; tagihanmu</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lp-scroll" style="padding-top:16px;">
+      <div class="up-hero-carousel" id="upHeroCarousel" onscroll="upHeroCarouselScroll()">
+        <div class="up-hero-slide" id="upHeroSlideUtang"></div>
+        <div class="up-hero-slide" id="upHeroSlidePiutang"></div>
+      </div>
+      <div class="up-hero-dots" id="upHeroDots">
+        <span class="up-hero-dot-ind active"></span>
+        <span class="up-hero-dot-ind"></span>
+      </div>
+
+      <div class="up-list-head" id="upListHead"></div>
+
+      <div id="upList" class="up-list"></div>
+
+      <div class="bdg-empty" id="upEmptyState" style="display:none;">
+        <i class="bi bi-cash-coin"></i>
+        <div class="bdg-empty-title">Belum Ada Utang Tercatat</div>
+        <div class="bdg-empty-sub">Tap tombol di bawah untuk mencatat pinjaman, KPR, atau paylater yang perlu dilunasi.</div>
+      </div>
+
+      <button class="kt-add-btn" id="upFabAction" onclick="openUpForm(null)" style="margin-top:12px;">
+        <i class="bi bi-plus-lg"></i> Catat Utang
+      </button>
+
+      <div style="height:80px;"></div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- ====================================================== -->
+  <!-- SHEET: TAMBAH / EDIT UTANG-PIUTANG                     -->
+  <!-- ====================================================== -->
+  <div class="sheet-overlay" id="upFormOverlay" onclick="if(event.target===this)closeSheet('upFormOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title" id="upFormTitle">Tambah Catatan</span>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <button class="sheet-close" id="upFormDeleteBtn" onclick="upFormDeleteFromSheet()" style="display:none;"><i class="bi bi-trash3"></i></button>
+          <button class="sheet-close" onclick="closeSheet('upFormOverlay')"><i class="bi bi-x-lg"></i></button>
+        </div>
+      </div>
+
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="field">
+          <label class="field-label">Jenis</label>
+          <div class="type-seg">
+            <div class="type-seg-item up-form-kind-tab active" data-kind="utang" onclick="setUpFormKind('utang')">Utang</div>
+            <div class="type-seg-item up-form-kind-tab" data-kind="piutang" onclick="setUpFormKind('piutang')">Piutang</div>
+          </div>
+        </div>
+
+        <div class="field" id="upFormCategoryField">
+          <label class="field-label">Kategori Utang</label>
+          <div class="field-card" id="upFormCategoryCard" onclick="openUpCategoryPicker()">
+            <div class="field-card-icon-mono" id="upFormCategoryIconWrap"><i class="bi bi-house-door"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="upFormCategoryLabel">KPR</div>
+            </div>
+            <i class="bi bi-chevron-right field-card-chevron"></i>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" id="upFormNameLabel">Nama</label>
+          <input class="input" id="upFormNameInput" placeholder="cth. Bank BCA, Kredivo, dll" maxlength="60"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">Nominal Total</label>
+            <div class="input input-row-box" style="padding-left:14px;">
+              <span class="input-prefix">Rp</span>
+              <input class="input-amount" id="upFormTotalInput" type="text" inputmode="numeric" placeholder="0"
+                     enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                     style="border:none; padding:0; width:100%; background:transparent; color:var(--ink-900);"
+                     oninput="formatAmountInput(this); renderUpFormMoveNote();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Cicilan/Bulan (Opsional)</label>
+            <div class="input input-row-box" style="padding-left:14px;">
+              <span class="input-prefix">Rp</span>
+              <input class="input-amount" id="upFormInstallmentInput" type="text" inputmode="numeric" placeholder="0"
+                     enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                     style="border:none; padding:0; width:100%; background:transparent; color:var(--ink-900);"
+                     oninput="formatAmountInput(this)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="field" id="upFormMoveSection">
+          <label class="field-label">Cara Pencatatan <i class="bi bi-question-circle" style="color:var(--ink-300); cursor:pointer;" onclick="goToFaqUp()"></i></label>
+          <div class="field-card" id="upFormMoveCard" onclick="openUpMoveModePicker()">
+            <div class="field-card-icon-mono" id="upFormMoveIconWrap"><i class="bi bi-clock-history"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="upFormMoveLabel">Sudah Ada Sebelumnya</div>
+              <div class="field-card-sub" id="upFormMoveSub">Saldo tidak berubah, cuma dicatat</div>
+            </div>
+            <i class="bi bi-chevron-right field-card-chevron"></i>
+          </div>
+
+          <div class="field" id="upFormAccountField" style="display:none; margin-top:12px;">
+            <label class="field-label" id="upFormAccountFieldLabel">Uang Masuk ke Akun</label>
+            <div class="field-card placeholder" id="upFormAccountCard" onclick="upOpenAccountPicker('form')">
+              <div class="field-card-icon-mono" id="upFormAccountIconWrap"><i class="bi bi-wallet2"></i></div>
+              <div class="field-card-body">
+                <div class="field-card-title" id="upFormAccountLabel">Pilih akun</div>
+                <div class="field-card-sub" id="upFormAccountSub" style="display:none;"></div>
+              </div>
+              <i class="bi bi-chevron-right field-card-chevron"></i>
+            </div>
+            <div class="up-form-move-hint" id="upFormMoveNote"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Jatuh Tempo (Opsional)</label>
+          <div class="field-card placeholder" onclick="openUpFormDuePicker()">
+            <div class="field-card-icon-mono"><i class="bi bi-calendar-event"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="upFormDueLabel" data-value="">Pilih tanggal (opsional)</div>
+            </div>
+            <i class="bi bi-x-lg field-card-chevron" style="font-size:11px;" onclick="clearUpFormDue(event)"></i>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Catatan (Opsional)</label>
+          <input class="input" id="upFormNoteInput" placeholder="Tulis catatan..." maxlength="100"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <div id="upFormErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+        <button class="btn btn-primary" onclick="saveUpForm()">Simpan Catatan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: DETAIL UTANG-PIUTANG                             -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-utang-detail">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="closeUpDetail()">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div class="lp-title" id="upDetailTopTitle">Detail</div>
+      </div>
+      <div class="lp-topbar-right">
+        <div class="icon-btn-sm" onclick="openUpForm(upDetailId)"><i class="bi bi-pencil"></i></div>
+        <div class="icon-btn-sm" onclick="openUpHapusSheet()"><i class="bi bi-trash3"></i></div>
+      </div>
+    </div>
+    <div class="lp-scroll" style="padding-top:14px;">
+      <div id="upDetailCard"></div>
+      <div id="upDetailBody"></div>
+      <div style="height:32px;"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: BAYAR CICILAN / TERIMA PEMBAYARAN -->
+  <div class="sheet-overlay" id="upTxOverlay" onclick="if(event.target===this)closeSheet('upTxOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title" id="upTxTitle">Bayar Cicilan</span>
+        <button class="sheet-close" onclick="closeSheet('upTxOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="rw-summary-row">
+          <div class="rw-summary-card"><div class="rsc-label">Sisa Sekarang</div><div class="rsc-val" id="upTxSisaLabel">Rp0</div></div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Nominal</label>
+          <div class="input input-row-box" style="padding-left:14px;">
+            <span class="input-prefix">Rp</span>
+            <input class="input-amount" id="upTxAmountInput" type="text" inputmode="numeric" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                   style="border:none; padding:0; width:100%; background:transparent; color:var(--ink-900);"
+                   oninput="formatAmountInput(this); renderUpTxSummary();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+          <div class="quick-amount-row" id="upTxQuickRow" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"></div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" id="upTxAccountLabelTitle">Dari Akun</label>
+          <div class="field-card placeholder" id="upTxAccountCard" onclick="upOpenAccountPicker('tx')">
+            <div class="field-card-icon-mono" id="upTxAccountIconWrap"><i class="bi bi-wallet2"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="upTxAccountLabel">Pilih akun</div>
+              <div class="field-card-sub" id="upTxAccountSub" style="display:none;"></div>
+            </div>
+            <i class="bi bi-chevron-right field-card-chevron"></i>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Catatan (Opsional)</label>
+          <input class="input" id="upTxNoteInput" placeholder="Tulis catatan..." maxlength="100"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <div class="wl-info-card" id="upTxSummaryCard"></div>
+
+        <div id="upTxErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+        <button class="btn btn-primary" id="upTxSubmitBtn" onclick="submitUpTx()">Bayar Cicilan Sekarang</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: PILIH AKUN (dipakai Bayar/Terima Utang-Piutang) -->
+  <div class="sheet-overlay" id="upAccountPickerOverlay" onclick="if(event.target===this)closeSheet('upAccountPickerOverlay')">
+    <div class="sheet" style="max-height:60vh;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Pilih Akun</span>
+        <button class="sheet-close" onclick="closeSheet('upAccountPickerOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="picker-list" id="upAccountList"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: PILIH KATEGORI UTANG -->
+  <div class="sheet-overlay" id="upCategoryPickerOverlay" onclick="if(event.target===this)closeSheet('upCategoryPickerOverlay')">
+    <div class="sheet" style="max-height:50vh;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Pilih Kategori</span>
+        <button class="sheet-close" onclick="closeSheet('upCategoryPickerOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="picker-list" id="upCategoryPickerList"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: PILIH CARA PENCATATAN -->
+  <div class="sheet-overlay" id="upMoveModePickerOverlay" onclick="if(event.target===this)closeSheet('upMoveModePickerOverlay')">
+    <div class="sheet" style="max-height:50vh;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Cara Pencatatan</span>
+        <button class="sheet-close" onclick="closeSheet('upMoveModePickerOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="picker-list" id="upMoveModePickerList"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: HAPUS UTANG-PIUTANG -->
+  <div class="sheet-overlay" id="upHapusOverlay" onclick="if(event.target===this)closeSheet('upHapusOverlay')">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Hapus Catatan</span>
+        <button class="sheet-close" onclick="closeSheet('upHapusOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px;">
+        <div class="info-banner danger-banner">
+          <i class="bi bi-exclamation-triangle"></i>
+          <div class="info-banner-text" id="upHapusMsg">Catatan ini akan dihapus permanen.</div>
+        </div>
+        <button class="btn" style="background:var(--danger-100); color:var(--danger);" onclick="submitUpHapus()">
+          <i class="bi bi-trash3"></i> Hapus Catatan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: JURNAL INVESTASI                                 -->
+  <!-- ====================================================== -->
+  <!-- ====================================================== -->
+  <!-- PAGE: JURNAL INVESTASI                                 -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-jurnal">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="goTo('beranda')">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div>
+          <div class="lp-title">Jurnal Investasi</div>
+          <div class="lp-subtitle">Pantau modal & untung-rugi aset</div>
+        </div>
+      </div>
+      <div class="lp-topbar-right">
+        <div class="icon-btn-sm" id="jrEvaluasiBtn" onclick="goTo('jurnal-evaluasi')"><i class="bi bi-clipboard-data"></i></div>
+      </div>
+    </div>
+
+    <div class="lp-scroll" style="padding-top:16px;">
+      <div id="jrBody"></div>
+      <div style="height:60px;"></div>
+    </div>
+  </div>
+
+  <!-- PAGE: EVALUASI JURNAL -->
+  <div class="page" id="page-jurnal-evaluasi">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="goTo('jurnal')">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div>
+          <div class="lp-title">Evaluasi Jurnal</div>
+          <div class="lp-subtitle">Pola keputusan & hasilnya</div>
+        </div>
+      </div>
+    </div>
+    <div class="lp-scroll" style="padding-top:16px;">
+      <div id="jrEvaluasiBody"></div>
+    </div>
+  </div>
+
+  <!-- PAGE: TAMBAH ASET / BELI LAGI -->
+  <div class="page" id="page-jurnal-form">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="closeJurnalForm()">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div class="lp-title" id="jrFormTitle">Tambah Aset</div>
+      </div>
+    </div>
+
+    <div class="lp-scroll" style="padding-top:16px;">
+
+      <div class="field-row" style="margin-bottom:18px; align-items:flex-start;" id="jrLogoField">
+        <div style="flex:0 0 auto;">
+          <div class="wl-photo-box" id="jrLogoBox" style="width:100px; height:100px; border-radius:18px; flex-direction:column; display:flex; background:var(--primary-100); border-style:solid; border-color:var(--primary-100);" onclick="openJrLogoUpload(null)">
+            <i class="bi bi-image-fill" style="font-size:24px; color:var(--primary);"></i>
+            <div class="wl-photo-box-text" style="font-size:9.5px; margin-top:3px; color:var(--primary); font-weight:700;">Tambah Logo</div>
+          </div>
+          <div class="wl-photo-preview" id="jrLogoPreview" style="display:none; width:100px; height:100px; border-radius:18px; max-height:100px; min-height:100px;">
+            <img id="jrLogoPreviewImg" src="" alt="" style="cursor:pointer; width:100%; height:100%; object-fit:cover;" onclick="openJrLogoUpload(null)">
+            <div class="wl-photo-remove" onclick="removeJrLogo(event)"><i class="bi bi-x"></i></div>
+          </div>
+        </div>
+        <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:10px;">
+          <div class="field" style="margin-bottom:0;" id="jrNameField">
+            <label class="field-label">Nama Aset</label>
+            <input class="input" id="jrFormNameInput" placeholder="cth. BBCA, Bitcoin" maxlength="40"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+          <div class="field" style="margin-bottom:0;" id="jrJenisField">
+            <label class="field-label">Jenis Aset</label>
+            <div class="field-card placeholder" id="jrJenisCard" onclick="jrFormOpenJenisPicker()">
+              <div class="field-card-icon-mono" id="jrJenisIconWrap"><i class="bi bi-grid"></i></div>
+              <div class="field-card-body"><div class="field-card-title" id="jrJenisLabel">Pilih jenis aset</div></div>
+              <i class="bi bi-chevron-right field-card-chevron"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-row" style="margin-bottom:18px;">
+        <div class="field" style="margin-bottom:0;">
+          <label class="field-label">Jumlah Unit</label>
+          <input class="input" id="jrFormJumlahInput" type="text" inputmode="decimal" placeholder="0"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                 oninput="jrRenderFormTotal()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label class="field-label">Harga per Unit</label>
+          <div class="input input-row-box" style="padding-left:14px;">
+            <span class="input-prefix">Rp</span>
+            <input class="input-amount" id="jrFormHargaInput" type="text" inputmode="numeric" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                   style="border:none; padding:0; width:100%; background:transparent; font-size:16px; color:var(--ink-900);"
+                   oninput="formatAmountInput(this); jrRenderFormTotal();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+      </div>
+
+      <div class="field-row" style="margin-bottom:18px;">
+        <div class="field" style="margin-bottom:0;">
+          <label class="field-label">Dari Akun Investasi</label>
+          <div class="field-card placeholder" id="jrFormAccountCard" onclick="jrOpenAccountPicker('form')">
+            <div class="field-card-icon-mono" id="jrFormAccountIconWrap"><i class="bi bi-wallet2"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="jrFormAccountLabel">Pilih akun</div>
+              <div class="field-card-sub" id="jrFormAccountSub" style="display:none;"></div>
+            </div>
+            <i class="bi bi-chevron-right field-card-chevron"></i>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label class="field-label">Tanggal Beli</label>
+          <div class="field-card" id="jrFormDateCard" onclick="jrFormOpenDatePicker()">
+            <div class="field-card-icon" style="background:var(--accent2);"><i class="bi bi-calendar3"></i></div>
+            <div class="field-card-body"><div class="field-card-title" id="jrFormDateLabel">Pilih tanggal</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wl-info-card" style="margin-bottom:18px;">
+        <div class="wl-info-row"><i class="bi bi-calculator"></i><div class="wl-info-label">Total Beli</div><div class="wl-info-val" id="jrFormTotalVal">Rp0</div></div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Kondisi Emosi Saat Ini</label>
+        <select class="input" id="jrFormEmosiSelect" onchange="jrFormEmosi = this.value || null;">
+          <option value="">Gak diisi</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Alasan Keputusan <span style="color:var(--danger);">*</span></label>
+        <div class="jr-check-list" id="jrAlasanChips"></div>
+        <div style="font-size:10.5px; color:var(--ink-300); margin-top:8px;">Centang minimal satu, atau tulis di Catatan di bawah.</div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Catatan (Opsional, atau wajib kalau checklist kosong)</label>
+        <input class="input" id="jrFormNoteInput" placeholder="Tulis catatan..." maxlength="100"
+               enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+
+      <div class="jr-advanced-toggle" id="jrAdvancedToggleBtn" onclick="jrToggleAdvanced()">
+        <div class="jr-advanced-toggle-label"><i class="bi bi-sliders"></i> Detail Lanjutan (Opsional)</div>
+        <i class="bi bi-chevron-down jr-advanced-toggle-chevron"></i>
+      </div>
+
+      <div id="jrAdvancedSection" style="display:none;">
+        <div class="field-row" style="margin-bottom:18px;">
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label">Rencana Jangka Waktu</label>
+            <div class="field-card placeholder" id="jrHorizonCard" onclick="jrFormOpenHorizonPicker()">
+              <div class="field-card-icon-mono"><i class="bi bi-signpost-split"></i></div>
+              <div class="field-card-body"><div class="field-card-title" id="jrHorizonLabel">Pilih horizon</div></div>
+              <i class="bi bi-chevron-right field-card-chevron"></i>
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label">Review Selanjutnya</label>
+            <div class="field-card" id="jrReviewDateCard" onclick="jrFormOpenReviewDatePicker()">
+              <div class="field-card-icon" style="background:var(--accent2);"><i class="bi bi-calendar-check"></i></div>
+              <div class="field-card-body"><div class="field-card-title" id="jrReviewDateLabel">Belum diatur</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-row" style="margin-bottom:18px;">
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label">Target Untung (%)</label>
+            <input class="input" id="jrFormTargetInput" type="text" inputmode="decimal" placeholder="cth. 20"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label">Batas Rugi (%)</label>
+            <input class="input" id="jrFormStopLossInput" type="text" inputmode="decimal" placeholder="cth. 10"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Kalau Harganya Naik</label>
+          <input class="input" id="jrFormSkenarioBaikInput" placeholder="cth. Harga naik sesuai ekspektasi" maxlength="120"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <div class="field">
+          <label class="field-label">Kalau Harganya Turun</label>
+          <input class="input" id="jrFormSkenarioBurukInput" placeholder="cth. Turun 20%, tambah posisi jika thesis masih valid" maxlength="120"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+      </div>
+
+      <div class="info-banner">
+        <i class="bi bi-info-circle"></i>
+        <div class="info-banner-text">Dana akan dipotong langsung dari Akun Investasi yang dipilih.</div>
+      </div>
+
+      <div id="jrFormErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+      <button class="btn btn-primary" onclick="saveJurnalForm()">Simpan</button>
+      <div style="height:40px;"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: PILIH JENIS ASET -->
+  <div class="sheet-overlay" id="jrJenisPickerOverlay" onclick="if(event.target===this)closeSheet('jrJenisPickerOverlay')">
+    <div class="sheet" style="max-height:60vh;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Pilih Jenis Aset</span>
+        <button class="sheet-close" onclick="closeSheet('jrJenisPickerOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="picker-list" id="jrJenisList"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: PILIH HORIZON INVESTASI -->
+  <div class="sheet-overlay" id="jrHorizonPickerOverlay" onclick="if(event.target===this)closeSheet('jrHorizonPickerOverlay')">
+    <div class="sheet" style="max-height:50vh;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Rencana Jangka Waktu</span>
+        <button class="sheet-close" onclick="closeSheet('jrHorizonPickerOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="picker-list" id="jrHorizonList"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: TAMBAH CHECKLIST CUSTOM -->
+  <div class="sheet-overlay" id="jrCustomTagOverlay" onclick="if(event.target===this)closeSheet('jrCustomTagOverlay')">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title" id="jrCustomTagTitle">Tambah Checklist</span>
+        <button class="sheet-close" onclick="closeSheet('jrCustomTagOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px;">
+        <input class="input" id="jrCustomTagInput" placeholder="Tulis alasan custom..." maxlength="40"
+               enterkeyhint="done" onkeydown="if(event.key==='Enter'){this.blur(); confirmJrCustomTag();}" style="margin-bottom:14px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button class="btn btn-primary" onclick="confirmJrCustomTag()">Tambah</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: PILIH AKUN (FORM BELI) -->
+  <div class="sheet-overlay" id="jrAccountPickerOverlay" onclick="if(event.target===this)closeSheet('jrAccountPickerOverlay')">
+    <div class="sheet" style="max-height:60vh;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Pilih Akun Investasi</span>
+        <button class="sheet-close" onclick="closeSheet('jrAccountPickerOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="picker-list" id="jrAccountList"></div>
+    </div>
+  </div>
+
+  <!-- PAGE: DETAIL ASET -->
+  <div class="page" id="page-jurnal-detail">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="goTo('jurnal')">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div>
+          <div class="lp-title" id="jrDetailTitle">Aset</div>
+          <div class="lp-subtitle" id="jrDetailSubtitle"></div>
+        </div>
+      </div>
+    </div>
+    <div class="lp-scroll" style="padding-top:16px;">
+      <div id="jrDetailBody"></div>
+      <div style="height:60px;"></div>
+    </div>
+  </div>
+
+  <!-- INPUT TERSEMBUNYI + CROP OVERLAY LOGO ASET (1:1, pakai Cropper.js) -->
+  <input type="file" id="jrLogoInputHidden" accept="image/*" style="display:none;" onchange="handleJrLogoFile(this.files[0])" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <div class="wl-crop-overlay" id="jrCropOverlay">
+    <div class="wl-crop-topbar">
+      <button class="wl-crop-topbar-btn" onclick="cancelJrCrop()"><i class="bi bi-x-lg"></i></button>
+      <div class="wl-crop-title">Sesuaikan Logo</div>
+      <button class="wl-crop-topbar-btn wl-crop-confirm" onclick="confirmJrCrop()"><i class="bi bi-check-lg"></i></button>
+    </div>
+    <div class="wl-crop-stage">
+      <img id="jrCropImage" src="" alt="">
+    </div>
+    <div class="wl-crop-hint">Geser untuk atur posisi, cubit/scroll untuk zoom</div>
+  </div>
+
+  <!-- INPUT TERSEMBUNYI: LAMPIRAN (tanpa crop, langsung disimpan) -->
+  <input type="file" id="jrLampiranInputHidden" accept="image/*" style="display:none;" onchange="handleJrLampiranFile(this.files[0])" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+
+  <!-- SHEET: DETAIL RIWAYAT (alasan/emosi/target -- bukan di list!) -->
+  <div class="sheet-overlay" id="jrRiwayatDetailOverlay" onclick="if(event.target===this)closeSheet('jrRiwayatDetailOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title" id="jrRiwayatDetailTitle">Detail</span>
+        <button class="sheet-close" onclick="closeSheet('jrRiwayatDetailOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;" id="jrRiwayatDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: UPDATE HARGA PASAR -->
+  <div class="sheet-overlay" id="jrHargaOverlay" onclick="if(event.target===this)closeSheet('jrHargaOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Update Harga Pasar</span>
+        <button class="sheet-close" onclick="closeSheet('jrHargaOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="wl-info-card" style="margin-bottom:16px;">
+          <div class="wl-info-row"><i class="bi bi-cash"></i><div class="wl-info-label">Harga Saat Ini</div><div class="wl-info-val" id="jrHargaCurrentLabel">Rp0</div></div>
+        </div>
+        <div class="field">
+          <label class="field-label">Harga Pasar Baru (per unit)</label>
+          <div class="input input-row-box" style="padding-left:14px;">
+            <span class="input-prefix">Rp</span>
+            <input class="input-amount" id="jrHargaInput" type="text" inputmode="numeric" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                   style="border:none; padding:0; width:100%; background:transparent; font-size:16px; color:var(--ink-900);"
+                   oninput="formatAmountInput(this)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+        <div id="jrHargaErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+        <button class="btn btn-primary" onclick="submitJrUpdateHarga()">Simpan Harga</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: JUAL ASET -->
+  <div class="sheet-overlay" id="jrJualOverlay" onclick="if(event.target===this)closeSheet('jrJualOverlay')">
+    <div class="sheet sheet-tall">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Jual Aset</span>
+        <button class="sheet-close" onclick="closeSheet('jrJualOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+        <div class="rw-summary-row">
+          <div class="rw-summary-card"><div class="rsc-label">Unit Dimiliki</div><div class="rsc-val" id="jrJualUnitLabel">0</div></div>
+          <div class="rw-summary-card"><div class="rsc-label">Harga Rata-rata</div><div class="rsc-val" id="jrJualAvgLabel">Rp0</div></div>
+        </div>
+
+        <div class="field-row" style="margin-bottom:18px;">
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label">Jumlah Dijual</label>
+            <input class="input" id="jrJualJumlahInput" type="text" inputmode="decimal" placeholder="0"
+                   enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label">Harga Jual per Unit</label>
+            <div class="input input-row-box" style="padding-left:14px;">
+              <span class="input-prefix">Rp</span>
+              <input class="input-amount" id="jrJualHargaInput" type="text" inputmode="numeric" placeholder="0"
+                     enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()"
+                     style="border:none; padding:0; width:100%; background:transparent; font-size:15px; color:var(--ink-900);"
+                     oninput="formatAmountInput(this)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Kondisi Emosi Saat Ini</label>
+          <select class="input" id="jrJualEmosiSelect" onchange="jrJualEmosiVal = this.value || null;">
+            <option value="">Gak diisi</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Dana Masuk ke Akun</label>
+          <div class="field-card placeholder" id="jrJualAccountCard" onclick="jrOpenAccountPicker('jual')">
+            <div class="field-card-icon-mono" id="jrJualAccountIconWrap"><i class="bi bi-wallet2"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="jrJualAccountLabel">Pilih akun</div>
+              <div class="field-card-sub" id="jrJualAccountSub" style="display:none;"></div>
+            </div>
+            <i class="bi bi-chevron-right field-card-chevron"></i>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Sesuai Rencana? <span style="color:var(--danger);">*</span></label>
+          <div class="jr-check-list" id="jrSesuaiRencanaChips"></div>
+        </div>
+
+        <div class="jr-advanced-toggle" id="jrJualAdvancedToggleBtn" onclick="jrToggleJualAdvanced()">
+          <div class="jr-advanced-toggle-label"><i class="bi bi-sliders"></i> Detail Lanjutan (Opsional)</div>
+          <i class="bi bi-chevron-down jr-advanced-toggle-chevron"></i>
+        </div>
+
+        <div id="jrJualAdvancedSection" style="display:none;">
+          <div class="field">
+            <label class="field-label">Alasan Jual</label>
+            <div class="jr-check-list" id="jrJualAlasanChips"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Catatan (Opsional)</label>
+          <input class="input" id="jrJualNoteInput" placeholder="Tulis catatan..." maxlength="100"
+                 enterkeyhint="done" onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <div id="jrJualErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:10px;"></div>
+        <button class="btn btn-primary" onclick="submitJrJual()">Jual Sekarang</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHEET: HAPUS ASET -->
+  <div class="sheet-overlay" id="jrHapusOverlay" onclick="if(event.target===this)closeSheet('jrHapusOverlay')">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">Hapus Aset</span>
+        <button class="sheet-close" onclick="closeSheet('jrHapusOverlay')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:0 20px 32px;">
+        <div class="info-banner danger-banner">
+          <i class="bi bi-exclamation-triangle"></i>
+          <div class="info-banner-text" id="jrHapusInfoText">Aset ini akan dihapus permanen.</div>
+        </div>
+        <button class="btn" style="background:var(--danger-100); color:var(--danger);" onclick="submitJrHapus()">
+          <i class="bi bi-trash3"></i> Hapus Aset
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: RIWAYAT                                          -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-riwayat">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div>
+          <div class="lp-title">Riwayat Transaksi</div>
+          <div class="lp-subtitle">Pantau seluruh transaksi kamu</div>
+        </div>
+      </div>
+      <div class="lp-topbar-right">
+        <div class="icon-btn-sm" onclick="toggleNotifPanel(event)">
+          <i class="bi bi-bell"></i>
+          <span class="notif-badge-dot"></span>
+        </div>
+        <div class="icon-btn-sm" onclick="goTo('pengaturan')">
+          <i class="bi bi-gear-fill"></i>
+        </div>
+      </div>
+    </div>
+    <div class="lp-scroll">
+
+      <!-- 3 Kartu Ringkasan -->
+      <div class="rw-summary-row" id="rwSummaryRow"></div>
+
+      <!-- Search + Tombol Filter -->
+      <div class="rw-search-row">
+        <input class="input rw-search-input" id="riwayatSearch" placeholder="Cari catatan..." oninput="filterRiwayat()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button class="rw-filter-btn" id="riwayatFilterBtn" onclick="openRwFilterSheet()">
+          <i class="bi bi-funnel"></i>
+          <span class="rw-filter-badge" id="rwFilterBadge" style="display:none;"></span>
+        </button>
+      </div>
+
+      <!-- Chip filter aktif (muncul kalau ada filter) -->
+      <div class="rw-active-chips" id="rwActiveChips" style="display:none;"></div>
+
+      <div class="rw-groups" id="riwayatGroups"></div>
+      <div class="kt-empty" id="riwayatEmptyState" style="display:none;">
+        <i class="bi bi-search" style="font-size:32px; color:var(--ink-300); display:block; margin-bottom:10px;"></i>
+        Tidak ada transaksi yang cocok
+        <br><button class="rw-empty-reset-btn" onclick="resetRwFilter()">Hapus Filter</button>
+      </div>
+    </div>
+    <div class="navbar">
+      <div class="nav-item" onclick="goTo('beranda')">
+        <i class="fi fi-sr-home"></i>
+        <span>Beranda</span>
+      </div>
+      <div class="nav-item" onclick="goTo('kantong')">
+        <i class="fi fi-sr-wallet-buyer"></i>
+        <span>Akun</span>
+      </div>
+      <div style="flex:1"></div>
+      <div class="nav-item" onclick="goTo('statistik')">
+        <i class="fi fi-ss-chart-pie-simple-circle-dollar"></i>
+        <span>Statistik</span>
+      </div>
+      <div class="nav-item active">
+        <i class="fi fi-ss-receipt"></i>
+        <span>Riwayat</span>
+      </div>
+    </div>
+    <div style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 10;">
+      <div class="fab" onclick="openAddTransaction()">
+        <i class="bi bi-plus-lg"></i>
+      </div>
+      <span class="fab-label" style="font-size: 10px; font-weight: 600; color: var(--ink-300);">Tambah Transaksi</span>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: STATISTIK                                        -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-statistik">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div>
+          <div class="lp-title">Statistik</div>
+          <div class="lp-subtitle">Analisis tren keuangan kamu</div>
+        </div>
+      </div>
+      <div class="lp-topbar-right">
+        <div class="icon-btn-sm" onclick="toggleNotifPanel(event)">
+          <i class="bi bi-bell"></i>
+          <span class="notif-badge-dot"></span>
+        </div>
+        <div class="icon-btn-sm" onclick="goTo('pengaturan')">
+          <i class="bi bi-gear-fill"></i>
+        </div>
+      </div>
+    </div>
+    <div class="lp-scroll">
+
+      <!-- Chip unit periode (scrollable horizontal) -->
+      <div class="st-unit-chips-wrap" id="statUnitChipsWrap">
+        <div class="st-unit-chips" id="statUnitChips">
+          <div class="st-unit-chip active" data-unit="all" onclick="setStatUnit('all')">Semua</div>
+          <div class="st-unit-chip" data-unit="1d" onclick="setStatUnit('1d')">1H</div>
+          <div class="st-unit-chip" data-unit="1w" onclick="setStatUnit('1w')">1M</div>
+          <div class="st-unit-chip" data-unit="1m" onclick="setStatUnit('1m')">Bln</div>
+          <div class="st-unit-chip" data-unit="3m" onclick="setStatUnit('3m')">3Bln</div>
+          <div class="st-unit-chip" data-unit="6m" onclick="setStatUnit('6m')">6Bln</div>
+          <div class="st-unit-chip" data-unit="1y" onclick="setStatUnit('1y')">Tahun</div>
+          <div class="st-unit-chip" data-unit="custom" onclick="setStatUnit('custom')"><i class="bi bi-calendar3"></i> Custom</div>
+        </div>
+      </div>
+
+      <!-- Nav prev/next + label periode (muncul kalau bukan Semua/Custom) -->
+      <div class="st-nav-row" id="statNavRow" style="display:none;">
+        <button class="st-nav-btn" onclick="navStatPeriod(-1)" id="statNavPrevBtn"><i class="bi bi-chevron-left"></i></button>
+        <span class="st-nav-jump-spacer" id="statJumpSpacer" style="display:none;"></span>
+        <span class="st-nav-label st-nav-label-clickable" id="statNavLabel" onclick="openStatUnitSheet()">Hari ini <i class="bi bi-chevron-down" style="font-size:11px; margin-left:4px;"></i></span>
+        <button class="st-nav-jump-btn" id="statJumpBtn" onclick="event.stopPropagation(); openStatDatePicker()" style="display:none;"><i class="bi bi-calendar3"></i></button>
+        <button class="st-nav-btn" onclick="navStatPeriod(1)" id="statNavNextBtn"><i class="bi bi-chevron-right"></i></button>
+      </div>
+
+      <div class="st-card">
+        <div class="st-card-head">
+          <span class="st-card-title">Tren Masuk vs Keluar</span>
+        </div>
+        <div class="st-legend" id="trendToggleRow">
+          <div class="st-legend-item active" data-line="masuk" onclick="toggleTrendLine('masuk')"><span class="st-dot in"></span>Masuk</div>
+          <div class="st-legend-item active" data-line="keluar" onclick="toggleTrendLine('keluar')"><span class="st-dot out"></span>Keluar</div>
+          <div class="st-legend-item active" data-line="selisih" onclick="toggleTrendLine('selisih')"><span class="st-dot sel"></span>Selisih</div>
+        </div>
+        <div class="st-chart-row">
+          <div class="st-chart-yaxis" id="trendYAxis"></div>
+          <div class="st-chart-col">
+            <div class="st-chart-wrap" id="trendChartWrap">
+              <div class="st-chart-tooltip" id="trendTooltip" style="display:none;"></div>
+              <svg id="trendSvg" class="st-trend-svg" viewBox="0 0 320 160" preserveAspectRatio="none"></svg>
+              <div class="st-crosshair-line" id="trendCrosshair" style="display:none;"></div>
+            </div>
+            <div class="st-chart-labels" id="trendChartLabels"></div>
+          </div>
+        </div>
+        <div class="st-trend-summary" id="trendSummary"></div>
+        <div class="st-extra-grid" id="statExtraGrid" style="display:none; margin-top:10px;"></div>
+        <button class="st-pie-seeall-btn" onclick="toggleStatExtra()" id="statExtraToggleBtn" style="margin-top:10px;">Lihat selengkapnya</button>
+      </div>
+
+      <div class="st-card">
+        <div class="st-card-head">
+          <span class="st-card-title" id="pieCardTitle">Pengeluaran per Kategori</span>
+        </div>
+        <div class="st-pie-wrap" id="pieWrap"></div>
+        <!-- Dots carousel di bawah konten, bisa swipe -->
+        <div class="st-pie-dots-row" id="pieDots">
+          <span class="st-pie-dot-ind active" data-view="keluar" onclick="setPieView('keluar')"></span>
+          <span class="st-pie-dot-ind" data-view="masuk" onclick="setPieView('masuk')"></span>
+        </div>
+        <div id="categoryFullList" style="display:none;"></div>
+      </div>
+
+    </div>
+    <div class="navbar">
+      <div class="nav-item" onclick="goTo('beranda')">
+        <i class="fi fi-sr-home"></i>
+        <span>Beranda</span>
+      </div>
+      <div class="nav-item" onclick="goTo('kantong')">
+        <i class="fi fi-sr-wallet-buyer"></i>
+        <span>Akun</span>
+      </div>
+      <div style="flex:1"></div>
+      <div class="nav-item active">
+        <i class="fi fi-ss-chart-pie-simple-circle-dollar"></i>
+        <span>Statistik</span>
+      </div>
+      <div class="nav-item" onclick="goTo('riwayat')">
+        <i class="fi fi-ss-receipt"></i>
+        <span>Riwayat</span>
+      </div>
+    </div>
+    <div style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 10;">
+      <div class="fab" onclick="openAddTransaction()">
+        <i class="bi bi-plus-lg"></i>
+      </div>
+      <span class="fab-label" style="font-size: 10px; font-weight: 600; color: var(--ink-300);">Tambah Transaksi</span>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: PENGATURAN                                       -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-pengaturan">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="goTo('beranda')">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div class="lp-title">Pengaturan</div>
+      </div>
+    </div>
+    <div class="lp-scroll">
+
+      <!-- PROFIL -->
+      <div class="section-label">Profil</div>
+      <div class="settings-profile-card">
+        <div class="settings-avatar-wrap" onclick="openAvatarOptions()">
+          <div class="settings-avatar" id="settingsAvatarPreview">A</div>
+          <div class="settings-avatar-edit"><i class="bi bi-camera-fill"></i></div>
+        </div>
+        <input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="handleAvatarUpload(event)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <div class="field" style="margin-top:18px; margin-bottom:0;">
+          <label class="field-label">Nama</label>
+          <input class="input" id="settingsNameInput" placeholder="Masukkan nama kamu" oninput="updateProfileName(this.value)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+      </div>
+
+      <!-- TAMPILAN -->
+      <div class="section-label" style="margin-top:24px;">Tampilan</div>
+      <div class="settings-menu-card">
+        <div class="settings-menu-item" onclick="openThemeSheet()">
+          <div class="settings-menu-icon" style="background:var(--primary-100)"><i class="bi bi-moon-stars" style="color:var(--primary)"></i></div>
+          <div class="settings-menu-body">
+            <div class="settings-menu-title">Tema Aplikasi</div>
+            <div class="settings-menu-sub">Light, Dark, atau Ikuti sistem</div>
+          </div>
+          <i class="bi bi-chevron-right settings-menu-chevron"></i>
+        </div>
+      </div>
+
+      <!-- KUSTOMISASI -->
+      <div class="section-label" style="margin-top:24px;">Kustomisasi</div>
+      <div class="settings-menu-card">
+        <div class="settings-menu-item" onclick="openKategoriSheet()">
+          <div class="settings-menu-icon" style="background:#EAF3FC"><i class="bi bi-tags" style="color:#2D7DD2"></i></div>
+          <div class="settings-menu-body">
+            <div class="settings-menu-title">Kelola Kategori</div>
+            <div class="settings-menu-sub">Tambah, edit, atau hapus kategori transaksi</div>
+          </div>
+          <i class="bi bi-chevron-right settings-menu-chevron"></i>
+        </div>
+      </div>
+
+      <!-- DATA -->
+      <div class="section-label" style="margin-top:24px;">Data</div>
+      <div class="settings-menu-card">
+        <div class="settings-menu-item" onclick="openDataSheet()">
+          <div class="settings-menu-icon" style="background:#E9F7EF"><i class="bi bi-database" style="color:#1B9E5E"></i></div>
+          <div class="settings-menu-body">
+            <div class="settings-menu-title">Backup & Restore</div>
+            <div class="settings-menu-sub">Ekspor data atau pulihkan dari backup</div>
+          </div>
+          <i class="bi bi-chevron-right settings-menu-chevron"></i>
+        </div>
+      </div>
+
+      <!-- BANTUAN -->
+      <div class="section-label" style="margin-top:24px;">Bantuan</div>
+      <div class="settings-menu-card">
+        <div class="settings-menu-item" onclick="openFaqSheet()">
+          <div class="settings-menu-icon" style="background:#FFF4E0"><i class="bi bi-question-circle" style="color:#B07A20"></i></div>
+          <div class="settings-menu-body">
+            <div class="settings-menu-title">FAQ</div>
+            <div class="settings-menu-sub">Pertanyaan yang sering ditanyakan</div>
+          </div>
+          <i class="bi bi-chevron-right settings-menu-chevron"></i>
+        </div>
+      </div>
+
+      <div style="height:32px;"></div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- BOTTOM SHEET: AVATAR OPTIONS                           -->
+  <!-- ====================================================== -->
+  <div class="sheet-overlay" id="avatarOptionsSheet" onclick="closeSheet('avatarOptionsSheet')">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div class="sheet-title">Foto Profil</div>
+        <button class="sheet-close" onclick="closeSheet('avatarOptionsSheet')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding-bottom:8px;">
+        <div class="settings-menu-item" style="padding:14px 4px;" onclick="document.getElementById('avatarFileInput').click(); closeSheet('avatarOptionsSheet')">
+          <div class="settings-menu-icon" style="background:var(--primary-100)"><i class="bi bi-camera" style="color:var(--primary)"></i></div>
+          <div class="settings-menu-body"><div class="settings-menu-title">Ganti Foto</div></div>
+        </div>
+        <div class="settings-menu-item" style="padding:14px 4px;" onclick="removeAvatar()">
+          <div class="settings-menu-icon" style="background:var(--danger-100)"><i class="bi bi-trash" style="color:var(--danger)"></i></div>
+          <div class="settings-menu-body"><div class="settings-menu-title" style="color:var(--danger)">Hapus Foto</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- BOTTOM SHEET: TEMA                                     -->
+  <!-- ====================================================== -->
+  <div class="sheet-overlay" id="themeSheet" onclick="closeSheet('themeSheet')">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div class="sheet-title">Tema Aplikasi</div>
+        <button class="sheet-close" onclick="closeSheet('themeSheet')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="theme-options-grid">
+        <div class="theme-option" data-theme="light" onclick="setTheme('light')">
+          <div class="theme-preview theme-preview-light">
+            <div class="theme-preview-bar"></div>
+            <div class="theme-preview-card"></div>
+            <div class="theme-preview-card short"></div>
+          </div>
+          <div class="theme-option-label"><i class="bi bi-sun"></i> Light</div>
+        </div>
+        <div class="theme-option" data-theme="dark" onclick="setTheme('dark')">
+          <div class="theme-preview theme-preview-dark">
+            <div class="theme-preview-bar"></div>
+            <div class="theme-preview-card"></div>
+            <div class="theme-preview-card short"></div>
+          </div>
+          <div class="theme-option-label"><i class="bi bi-moon-stars"></i> Dark</div>
+        </div>
+        <div class="theme-option" data-theme="system" onclick="setTheme('system')">
+          <div class="theme-preview theme-preview-system">
+            <div class="theme-preview-bar"></div>
+            <div class="theme-preview-card"></div>
+            <div class="theme-preview-card short"></div>
+          </div>
+          <div class="theme-option-label"><i class="bi bi-display"></i> Sistem</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- BOTTOM SHEET: KELOLA KATEGORI                          -->
+  <!-- ====================================================== -->
+  <div class="sheet-overlay" id="kategoriSheet" onclick="closeSheet('kategoriSheet')">
+    <div class="sheet sheet-tall" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div class="sheet-title">Kelola Kategori</div>
+        <button class="sheet-close" onclick="closeSheet('kategoriSheet')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="ktab-row">
+        <div class="ktab-btn active" data-type="keluar" onclick="switchKategoriType('keluar')">Keluar</div>
+        <div class="ktab-btn" data-type="masuk" onclick="switchKategoriType('masuk')">Masuk</div>
+      </div>
+      <div class="kat-list-wrap" id="kategoriList"></div>
+      <div style="padding:12px 0 8px;">
+        <button class="btn btn-primary" style="width:100%;" onclick="openAddKategori()">
+          <i class="bi bi-plus"></i> Tambah Kategori
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- BOTTOM SHEET: FORM KATEGORI                            -->
+  <!-- ====================================================== -->
+  <div class="sheet-overlay" id="kategoriFormSheet" onclick="closeSheet('kategoriFormSheet')">
+    <div class="sheet sheet-tall" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div class="sheet-title" id="kategoriFormTitle">Tambah Kategori</div>
+        <button class="sheet-close" onclick="closeSheet('kategoriFormSheet')"><i class="bi bi-x-lg"></i></button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:0;flex:1;overflow-y:auto;">
+        <!-- Preview -->
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+          <div class="kat-form-preview" id="katIconPreview"><i class="bi bi-circle"></i></div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:2px;">Pratinjau</div>
+            <div style="font-size:13px;font-weight:700;color:var(--ink-900)" id="katNamePreviewLabel">—</div>
+          </div>
+        </div>
+
+        <!-- Name -->
+        <div class="field" style="margin-bottom:16px;">
+          <label class="field-label">Nama Kategori</label>
+          <input class="input" id="kategoriNameInput" placeholder="Contoh: Olahraga" maxlength="30"
+            oninput="document.getElementById('katNamePreviewLabel').textContent = this.value || '—'" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <!-- Icon picker -->
+        <div class="field-label" style="margin-bottom:8px;">Pilih Ikon</div>
+        <div class="kat-icon-grid" id="katIconGrid"></div>
+
+        <!-- Color picker -->
+        <div class="field-label" style="margin-top:14px;margin-bottom:8px;">Pilih Warna</div>
+        <div class="kat-color-grid" id="katColorGrid"></div>
+
+        <div style="height:16px;"></div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="saveKategoriForm()">Simpan</button>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- BOTTOM SHEET: DATA                                     -->
+  <!-- ====================================================== -->
+  <div class="sheet-overlay" id="dataSheet" onclick="closeSheet('dataSheet')">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div class="sheet-title">Backup & Restore</div>
+        <button class="sheet-close" onclick="closeSheet('dataSheet')"><i class="bi bi-x-lg"></i></button>
+      </div>
+
+      <!-- Summary -->
+      <div class="data-summary-card">
+        <div class="data-summary-row">
+          <i class="bi bi-arrow-left-right" style="color:var(--primary)"></i>
+          <span id="dataSummaryTx">— transaksi</span>
+        </div>
+        <div class="data-summary-row">
+          <i class="bi bi-wallet2" style="color:var(--primary)"></i>
+          <span id="dataSummarySrc">— sumber dana</span>
+        </div>
+        <div class="data-summary-row">
+          <i class="bi bi-hdd" style="color:var(--ink-500)"></i>
+          <span id="dataSummarySize">— KB digunakan</span>
+        </div>
+      </div>
+
+      <input type="file" id="restoreFileInput" accept=".json" style="display:none;" onchange="handleRestoreFile(event)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+
+      <div class="data-action-group">
+        <button class="btn btn-primary" onclick="backupData()">
+          <i class="bi bi-download"></i> Backup Data
+        </button>
+        <button class="btn" style="background:var(--surface-sunken);color:var(--ink-900);" onclick="triggerRestoreFile()">
+          <i class="bi bi-upload"></i> Pulihkan Data
+        </button>
+      </div>
+
+      <div class="data-danger-divider"><span>Zona Bahaya</span></div>
+
+      <div class="data-action-group">
+        <button class="btn" style="background:var(--danger-100);color:var(--danger);" onclick="deleteAllData()">
+          <i class="bi bi-trash"></i> Hapus Semua Data
+        </button>
+        <button class="btn" style="background:var(--surface-sunken);color:var(--ink-900);" onclick="resetAppCache()">
+          <i class="bi bi-arrow-repeat"></i> Reset Aplikasi
+        </button>
+      </div>
+
+      <div class="kt-info-note" style="margin-top:16px;">
+        <i class="bi bi-info-circle"></i>
+        <span>Data disimpan di perangkat secara lokal, lakukan backup rutin agar tidak hilang. <b>Reset Aplikasi</b> aman — cuma memuat ulang file app, tidak menghapus data, berguna saat ada update atau app terasa nyangkut.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- BOTTOM SHEET: FAQ                                      -->
+  <!-- ====================================================== -->
+  <div class="sheet-overlay" id="faqSheet" onclick="closeSheet('faqSheet')">
+    <div class="sheet sheet-tall" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div class="sheet-title">FAQ</div>
+        <button class="sheet-close" onclick="closeSheet('faqSheet')"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="faq-list" id="faqList"></div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: DETAIL SUMBER DANA                               -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-source-detail">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="goTo('kantong')">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div class="lp-title" id="sourceDetailTitle">Sumber Dana</div>
+      </div>
+    </div>
+    <div class="lp-scroll">
+      <div class="sd-hero">
+        <div class="sd-hero-icon" id="sourceDetailIcon"><i class="fi fi-sc-wallet"></i></div>
+        <div class="sd-hero-label">Saldo Saat Ini</div>
+        <div class="sd-hero-amount" id="sourceDetailAmount">Rp0</div>
+      </div>
+
+      <div class="sd-action-row">
+        <div class="sd-action-btn in" onclick="sourceDetailQuickTransfer('in')">
+          <i class="bi bi-arrow-down-circle"></i>
+          <span>Tambah Dana</span>
+        </div>
+        <div class="sd-action-btn out" onclick="sourceDetailQuickTransfer('out')">
+          <i class="bi bi-arrow-up-circle"></i>
+          <span>Tarik Dana</span>
+        </div>
+        <div class="sd-action-btn" onclick="editSourceFromDetail()">
+          <i class="bi bi-pencil"></i>
+          <span>Edit</span>
+        </div>
+        <div class="sd-action-btn danger" onclick="deleteSourceFromDetail()">
+          <i class="bi bi-trash"></i>
+          <span>Hapus</span>
+        </div>
+      </div>
+
+      <div class="sd-action-row" id="sdChargeRow" style="display:none; margin-top:10px;">
+        <div class="sd-action-btn" id="sdAdminBtn" onclick="openAdminFeeSheet()">
+          <i class="bi bi-cash-stack"></i>
+          <span>Biaya Admin</span>
+        </div>
+        <div class="sd-action-btn" id="sdBungaBtn" onclick="openBungaSheet()">
+          <i class="bi bi-percent"></i>
+          <span>Bunga</span>
+        </div>
+      </div>
+
+      <div class="section-label" style="margin-top:22px;">Riwayat di Sumber Ini</div>
+      <div class="tx-list" id="sourceDetailTxList"></div>
+      <div class="sd-empty" id="sourceDetailEmptyState" style="display:none;">
+        <i class="bi bi-inbox"></i>
+        <span>Belum ada transaksi tercatat di sini</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================== -->
+  <!-- PAGE: DETAIL TRANSAKSI                                 -->
+  <!-- ====================================================== -->
+  <div class="page" id="page-tx-detail">
+    <div class="lp-topbar">
+      <div class="lp-topbar-left">
+        <div class="back-btn" onclick="closeTransactionDetail()">
+          <i class="bi bi-arrow-left"></i>
+        </div>
+        <div class="lp-title">Detail Transaksi</div>
+      </div>
+      <div class="lp-topbar-right">
+        <button class="icon-btn-sm" onclick="openActionSheet(txDetailId)">
+          <i class="bi bi-three-dots-vertical"></i>
+        </button>
+      </div>
+    </div>
+    <div class="lp-scroll">
+      <div class="td-hero">
+        <div class="td-hero-icon" id="txDetailIcon"><i class="bi bi-circle"></i></div>
+        <div class="td-hero-tag" id="txDetailTag">Pengeluaran</div>
+        <div class="td-hero-amount" id="txDetailAmount">Rp0</div>
+        <div class="td-hero-name" id="txDetailName">—</div>
+      </div>
+
+      <div class="td-field-list" id="txDetailFields"></div>
+
+      <div class="td-attach-wrap" id="txDetailAttachWrap" style="display:none;">
+        <div class="section-label">Lampiran</div>
+        <div class="td-attach-card" id="txDetailAttachCard" onclick="previewTxDetailAttachment()">
+          <div class="td-attach-icon"><i class="bi bi-file-image"></i></div>
+          <div class="td-attach-mid">
+            <div class="td-attach-name" id="txDetailAttachName">bukti.jpg</div>
+            <div class="td-attach-size" id="txDetailAttachSize">— KB</div>
+          </div>
+          <i class="bi bi-chevron-right" style="color:var(--ink-300); font-size:13px;"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: RINCIAN                                         -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="rincianOverlay" onclick="closeRincianOutside(event)">
+  <div class="sheet" style="max-height:75vh;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Rincian Saldo</span>
+      <button class="sheet-close" onclick="closeRincianSheet()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div style="overflow-y:auto; flex:1; padding-bottom:8px;">
+      <div class="breakdown-panel" style="margin-bottom:0; box-shadow:none; border:none; padding:0 4px 4px;">
+        <div class="breakdown-bar" id="breakdownBar"></div>
+        <div id="breakdownGroups"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: BIAYA ADMIN BULANAN                             -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="adminFeeSheetOverlay" onclick="if(event.target===this)closeSheet('adminFeeSheetOverlay')">
+  <div class="sheet" style="max-height:50vh;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Biaya Admin Bulanan</span>
+      <button class="sheet-close" onclick="closeSheet('adminFeeSheetOverlay')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+      <div class="field">
+        <label class="field-label">Nominal per Bulan</label>
+        <div class="input input-row-box" style="padding-left:14px;">
+          <span class="input-prefix">Rp</span>
+          <input class="input-amount" id="adminFeeInput" type="text" inputmode="numeric"
+                 enterkeyhint="done"
+                 style="border:none; padding:0; width:100%; background:transparent; color:var(--ink-900);"
+                 placeholder="0" oninput="formatAmountInput(this)"
+                 onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+      </div>
+      <div class="kt-info-note" style="margin-bottom:18px;">
+        <i class="bi bi-info-circle"></i>
+        <span>Dipotong otomatis dari saldo setiap awal bulan. Isi 0 kalau akun ini bebas biaya admin.</span>
+      </div>
+      <button class="btn btn-primary" onclick="saveAdminFee()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: BUNGA & PPH                                     -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="bungaSheetOverlay" onclick="if(event.target===this)closeSheet('bungaSheetOverlay')">
+  <div class="sheet" style="max-height:65vh;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Bunga Bulanan</span>
+      <button class="sheet-close" onclick="closeSheet('bungaSheetOverlay')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+      <div class="field">
+        <label class="field-label">Bunga per Bulan</label>
+        <div class="input input-row-box" style="padding-left:14px;">
+          <input id="bungaPercentInput" type="number" step="0.01" min="0"
+                 inputmode="decimal" enterkeyhint="done"
+                 style="border:none; padding:0; width:100%; background:transparent; color:var(--ink-900); font-family:'JetBrains Mono', monospace; font-weight:700;"
+                 placeholder="0"
+                 onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <span class="input-prefix">%</span>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">PPh Final <span style="color:var(--ink-300); font-weight:500;">(dipotong otomatis dari bunga kotor)</span></label>
+        <div class="input input-row-box" style="padding-left:14px;">
+          <input id="pphPercentInput" type="number" step="0.01" min="0"
+                 inputmode="decimal" enterkeyhint="done"
+                 style="border:none; padding:0; width:100%; background:transparent; color:var(--ink-900); font-family:'JetBrains Mono', monospace; font-weight:700;"
+                 placeholder="20"
+                 onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <span class="input-prefix">%</span>
+        </div>
+      </div>
+      <div class="kt-info-note" style="margin-bottom:18px;">
+        <i class="bi bi-info-circle"></i>
+        <span>Default PPh 20% sesuai aturan pajak bunga tabungan/deposito. Kalau saldo akhir bulan ≤ Rp7.500.000, sistem otomatis membebaskan pajak (0%). Angka ini estimasi, bisa beda tipis dari mutasi bank asli.</span>
+      </div>
+      <button class="btn btn-primary" onclick="saveBunga()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: PILIH JENIS AKUN                                -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="accTypeOverlay" onclick="closeAccTypeOutside(event)">
+  <div class="sheet" style="max-height:55vh;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Tambah Akun</span>
+      <button class="sheet-close" onclick="closeAccType()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <p style="font-size:12.5px; color:var(--ink-500); font-weight:500; margin-bottom:16px; line-height:1.5;">Pilih jenis akun yang ingin kamu tambahkan:</p>
+    <div class="acc-type-grid">
+      <div class="acc-type-item" onclick="selectAccType('tunai')">
+        <div class="acc-type-icon" style="background:#06A876;"><i class="fi fi-ss-money-bill-wave"></i></div>
+        <div class="acc-type-name">Cash</div>
+        <div class="acc-type-desc">Uang tunai di dompet atau laci</div>
+      </div>
+      <div class="acc-type-item" onclick="selectAccType('rekening')">
+        <div class="acc-type-icon" style="background:#499AFD;"><i class="fi fi-sr-bank"></i></div>
+        <div class="acc-type-name">Bank</div>
+        <div class="acc-type-desc">Rekening tabungan atau giro</div>
+      </div>
+      <div class="acc-type-item" onclick="selectAccType('ewallet')">
+        <div class="acc-type-icon" style="background:#775EED;"><i class="fi fi-sc-wallet"></i></div>
+        <div class="acc-type-name">E-Wallet</div>
+        <div class="acc-type-desc">GoPay, OVO, Dana, dll</div>
+      </div>
+      <div class="acc-type-item" onclick="selectAccType('invest')">
+        <div class="acc-type-icon" style="background:#F98F00;"><i class="fi fi-br-growth-chart-invest"></i></div>
+        <div class="acc-type-name">Investasi</div>
+        <div class="acc-type-desc">RDN sekuritas, wallet exchange</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: TAMBAH SUMBER DANA                             -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="sourceFormOverlay" onclick="closeSourceFormOutside(event)">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="sourceFormTitle">Tambah Sumber Dana</span>
+      <button class="sheet-close" onclick="closeSourceForm()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
+    <div class="field" style="display:flex; align-items:center; gap:14px;">
+      <div class="acc-item-icon-wrap" id="sourceFormIconPreview" style="width:52px; height:52px; border-radius:14px; background:var(--primary);">
+        <i class="fi fi-sr-bank" style="font-size:22px;"></i>
+      </div>
+      <div style="flex:1; display:flex; gap:6px;">
+        <button class="icon-opt-btn" onclick="document.getElementById('sourceFormIconUpload').click()"><i class="bi bi-upload"></i> Upload</button>
+        <button class="icon-opt-btn" onclick="toggleIconLinkInput()"><i class="bi bi-link-45deg"></i> Link URL</button>
+        <button class="icon-opt-btn" onclick="resetSourceFormIcon()" style="flex:0; padding:9px 10px;"><i class="bi bi-arrow-counterclockwise"></i></button>
+      </div>
+      <input type="file" id="sourceFormIconUpload" accept="image/*" style="display:none;" onchange="handleSourceIconUpload(event)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div class="field" id="sourceFormIconLinkField" style="display:none;">
+      <input class="input" id="sourceFormIconLink" placeholder="Tempel URL gambar di sini..." oninput="handleSourceIconLink(this.value)" style="margin-bottom:0;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div style="background:var(--info-100); border-radius:10px; padding:12px 14px; border:1px solid rgba(32,101,184,0.12); margin: 0 0 12px;">
+      <div style="display:flex; align-items:center; gap:7px; margin-bottom:8px;">
+        <i class="bi bi-info-circle" style="color:var(--info); font-size:14px; flex-shrink:0;"></i>
+        <span style="font-size:12px; font-weight:800; color:var(--info);">Cara mendapatkan URL gambar (mobile)</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; gap:8px; align-items:flex-start;">
+          <span style="width:18px; height:18px; border-radius:50%; background:var(--info); color:#fff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px;">1</span>
+          <span style="font-size:11.5px; color:var(--ink-700); font-weight:500; line-height:1.5;">Cari logo/gambar di <b>Google Images</b> atau browser</span>
+        </div>
+        <div style="display:flex; gap:8px; align-items:flex-start;">
+          <span style="width:18px; height:18px; border-radius:50%; background:var(--info); color:#fff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px;">2</span>
+          <span style="font-size:11.5px; color:var(--ink-700); font-weight:500; line-height:1.5;">Tahan gambar → pilih <b>"Buka gambar di tab baru"</b></span>
+        </div>
+        <div style="display:flex; gap:8px; align-items:flex-start;">
+          <span style="width:18px; height:18px; border-radius:50%; background:var(--info); color:#fff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px;">3</span>
+          <span style="font-size:11.5px; color:var(--ink-700); font-weight:500; line-height:1.5;">Salin URL dari <b>address bar</b> tab baru tersebut</span>
+        </div>
+        <div style="display:flex; gap:8px; align-items:flex-start;">
+          <span style="width:18px; height:18px; border-radius:50%; background:var(--info); color:#fff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px;">4</span>
+          <span style="font-size:11.5px; color:var(--ink-700); font-weight:500; line-height:1.5;">Tap <b>"Link URL"</b> di atas → paste URL → preview langsung muncul</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Nama</label>
+      <input class="input" id="sourceFormName" placeholder="cth. BCA, GoPay, Tunai" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+
+    <div class="field" id="sourceFormJenisField">
+      <label class="field-label">Jenis</label>
+      <div class="type-seg" id="sourceFormJenis">
+        <div class="type-seg-item active" data-jenis="rekening">Bank</div>
+        <div class="type-seg-item" data-jenis="ewallet">E-Wallet</div>
+        <div class="type-seg-item" data-jenis="tunai">Cash</div>
+        <div class="type-seg-item" data-jenis="invest">Investasi</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" id="sourceFormSaldoLabel">Saldo Awal</label>
+      <div class="input input-row-box" style="padding-left:14px;">
+        <span class="input-prefix">Rp</span>
+        <input class="input-amount" id="sourceFormSaldo" style="border:none; padding:0; width:100%; background:transparent;" placeholder="0" inputmode="numeric" oninput="formatAmountInput(this)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+    </div>
+
+    <div class="info-banner" id="sourceFormSaldoLockNote" style="display:none;">
+      <i class="bi bi-info-circle"></i>
+      <div class="info-banner-text">Saldo rekening investasi hanya berubah lewat Tambah Dana / Tarik Dana, supaya tetap tercatat sebagai transaksi yang sah.</div>
+    </div>
+
+    <div class="info-banner">
+      <i class="bi bi-info-circle"></i>
+      <div class="info-banner-text">Saldo awal otomatis tercatat sebagai transaksi "Saldo Awal", terpisah dari Pemasukan biasa.</div>
+    </div>
+
+    <button class="btn btn-primary" onclick="saveSourceForm()" style="background:var(--primary); cursor:pointer;">Simpan Sumber Dana</button>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: ACTION SUMBER DANA                             -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="sourceActionOverlay" onclick="closeSourceActionOutside(event)">
+  <div class="sheet" style="max-height:40vh;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="sourceActionTitle">Sumber Dana</span>
+      <button class="sheet-close" onclick="closeSourceAction()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="action-row" onclick="editSourceFromAction()">
+      <div class="action-icon"><i class="bi bi-pencil"></i></div>
+      <span>Edit Sumber Dana</span>
+    </div>
+    <div class="action-row danger" onclick="deleteSourceFromAction()">
+      <div class="action-icon danger"><i class="bi bi-trash"></i></div>
+      <span>Hapus Sumber Dana</span>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: TAMBAH TRANSAKSI                                -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="sheetOverlay" onclick="closeSheetOutside(event)">
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Tambah Transaksi</span>
+      <button class="sheet-close" onclick="closeSheet()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
+    <div class="info-banner" id="noSourceBanner" style="display:none;">
+      <i class="bi bi-info-circle"></i>
+      <div class="info-banner-text">Belum ada sumber dana. Tambahkan dulu di halaman Kantong sebelum mencatat transaksi.</div>
+    </div>
+
+    <div class="type-seg" id="txTypeSeg">
+      <div class="type-seg-item active" data-type="keluar">Keluar</div>
+      <div class="type-seg-item" data-type="masuk">Masuk</div>
+      <div class="type-seg-item" data-type="transfer">Transfer</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Nominal</label>
+      <div class="input input-row-box" style="padding-left:14px;">
+        <span class="input-prefix">Rp</span>
+        <input class="input-amount" id="txAmount" style="border:none; padding:0; width:100%; background:transparent;" placeholder="0" inputmode="numeric" oninput="formatAmountInput(this); toggleAmountClear();" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button class="input-clear" id="txAmountClear" onclick="document.getElementById('txAmount').value=''; toggleAmountClear(); document.getElementById('txAmount').focus();" style="display:none;"><i class="bi bi-x"></i></button>
+        <button class="input-calc-btn" onclick="openCalcSheet()" title="Kalkulator"><i class="bi bi-calculator"></i></button>
+      </div>
+      <div class="quick-amounts" id="txQuickAmounts"></div>
+    </div>
+
+    <!-- KELUAR / MASUK -->
+    <div id="txKelMasukBlock" style="display:block;">
+      <div class="field-row" style="margin-bottom:18px;">
+        <div class="field" style="flex:1;">
+          <label class="field-label">Kategori</label>
+          <div class="field-card placeholder" id="txCategorySelect" onclick="openPicker('category')">
+            <div class="field-card-icon-mono" id="txCategoryIconWrap"><i class="bi bi-grid"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="txCategoryLabel">Pilih kategori</div>
+              <div class="field-card-sub" id="txCategorySub" style="display:none;"></div>
+            </div>
+            <i class="bi bi-chevron-right field-card-chevron"></i>
+          </div>
+        </div>
+        <div class="field" style="flex:1;">
+          <label class="field-label">Akun</label>
+          <div class="field-card placeholder" id="txSourceSelect" onclick="openPicker('source')">
+            <div class="field-card-icon-mono" id="txSourceIconWrap"><i class="bi bi-wallet2"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="txSourceLabelVal">Pilih</div>
+              <div class="field-card-sub" id="txSourceSub" style="display:none;"></div>
+            </div>
+            <i class="bi bi-chevron-right field-card-chevron"></i>
+          </div>
+        </div>
+      </div>
+      <div class="field-row" style="margin-bottom:18px;">
+        <div class="field">
+          <label class="field-label">Tanggal</label>
+          <div class="field-card-wrap">
+            <div class="field-card" onclick="openTxDatePicker('txDate','txDateLabel','txDateRelLabel')">
+              <div class="field-card-icon" style="background:var(--accent2);"><i class="bi bi-calendar3"></i></div>
+              <div class="field-card-body">
+                <div class="field-card-title" id="txDateLabel">—</div>
+                <div class="field-card-sub" id="txDateRelLabel">Hari ini</div>
+              </div>
+            </div>
+            <input type="hidden" id="txDate" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">Waktu</label>
+          <div class="field-card-wrap">
+            <div class="field-card" onclick="openTxTimePicker('txTime','txTimeLabel')">
+              <div class="field-card-icon" style="background:#B07A20;"><i class="bi bi-clock"></i></div>
+              <div class="field-card-body">
+                <div class="field-card-title" id="txTimeLabel">—</div>
+                <div class="field-card-sub">WIB</div>
+              </div>
+            </div>
+            <input type="hidden" id="txTime" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRANSFER -->
+    <div id="txTransferBlock" style="display:none;">
+      <div style="display:flex; align-items:flex-end; gap:8px; margin-bottom:18px;">
+        <div class="field" style="flex:1; margin-bottom:0;">
+          <label class="field-label">Dari Kantong</label>
+          <div class="field-card placeholder" id="txSourceSelectTransfer" onclick="openPicker('source')">
+            <div class="field-card-icon-mono" id="txSourceIconWrapTransfer"><i class="bi bi-wallet2"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="txSourceLabelValTransfer">Pilih kantong</div>
+              <div class="field-card-sub" id="txSourceSubTransfer" style="display:none;"></div>
+            </div>
+          </div>
+        </div>
+        <div style="flex-shrink:0; padding-bottom:13px;">
+          <i class="bi bi-arrow-right" style="font-size:18px; color:var(--primary); display:block;"></i>
+        </div>
+        <div class="field" style="flex:1; margin-bottom:0;">
+          <label class="field-label">Ke Kantong</label>
+          <div class="field-card placeholder" id="txDestSelect" onclick="openPicker('dest')">
+            <div class="field-card-icon-mono" id="txDestIconWrap"><i class="bi bi-wallet2"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="txDestLabelVal">Pilih kantong</div>
+              <div class="field-card-sub" id="txDestSub" style="display:none;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:18px;">
+        <label class="field-label">Fee Transaksi <span style="color:var(--ink-300); font-weight:500;">(opsional)</span></label>
+        <div class="input input-row-box" style="padding-left:14px;">
+          <span class="input-prefix">Rp</span>
+          <input class="input-amount" id="txFee" style="border:none; padding:0; width:100%; background:transparent; font-size:16px;" placeholder="0" inputmode="numeric" oninput="formatAmountInput(this)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+      </div>
+      <div class="field-row" style="margin-bottom:18px;">
+        <div class="field">
+          <label class="field-label">Tanggal</label>
+          <div class="field-card-wrap">
+            <div class="field-card" onclick="openTxDatePicker('txDateTransfer','txDateTransferLabel','txDateTransferRelLabel')">
+              <div class="field-card-icon" style="background:var(--accent2);"><i class="bi bi-calendar3"></i></div>
+              <div class="field-card-body">
+                <div class="field-card-title" id="txDateTransferLabel">—</div>
+                <div class="field-card-sub" id="txDateTransferRelLabel">Hari ini</div>
+              </div>
+            </div>
+            <input type="hidden" id="txDateTransfer" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">Waktu</label>
+          <div class="field-card-wrap">
+            <div class="field-card" onclick="openTxTimePicker('txTimeTransfer','txTimeTransferLabel')">
+              <div class="field-card-icon" style="background:#B07A20;"><i class="bi bi-clock"></i></div>
+              <div class="field-card-body">
+                <div class="field-card-title" id="txTimeTransferLabel">—</div>
+                <div class="field-card-sub">WIB</div>
+              </div>
+            </div>
+            <input type="hidden" id="txTimeTransfer" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:18px;">
+      <div class="field-label-row">
+        <label class="field-label" style="margin-bottom:0;">Catatan <span style="color:var(--ink-300); font-weight:500;">(opsional)</span></label>
+        <span class="field-char-count" id="txNoteCount">0/60</span>
+      </div>
+      <div class="input input-row-box" style="padding-left:12px;">
+        <i class="bi bi-pencil" style="font-size:13px; color:var(--ink-300); flex-shrink:0;"></i>
+        <input id="txNote" style="border:none; padding:8px 0; width:100%; background:transparent; font-size:13.5px;" placeholder="Tulis catatan..." maxlength="60" oninput="document.getElementById('txNoteCount').textContent = this.value.length + '/60';" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:18px;">
+      <label class="field-label">Lampiran <span style="color:var(--ink-300); font-weight:500;">(opsional)</span></label>
+      <input type="file" id="txAttachInput" accept="image/*" style="display:none;" onchange="handleAttachFile(this.files[0])" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <div class="attach-box" id="txAttachBox" onclick="document.getElementById('txAttachInput').click();">
+        <i class="bi bi-paperclip"></i>
+        <span class="attach-box-text">Tambah foto atau bukti</span>
+        <i class="bi bi-chevron-right field-card-chevron"></i>
+      </div>
+      <div class="attach-preview" id="txAttachPreview" style="display:none;">
+        <img class="attach-thumb" id="txAttachThumb" src="" alt="">
+        <div class="attach-info">
+          <div class="attach-name" id="txAttachName">bukti.jpg</div>
+          <div class="attach-sub">Lampiran ditambahkan</div>
+        </div>
+        <button class="attach-remove" onclick="removeAttachFile(event)"><i class="bi bi-x-lg"></i></button>
+      </div>
+    </div>
+
+    <div class="info-banner danger-banner" id="txErrorBanner" style="display:none;">
+      <i class="bi bi-exclamation-circle"></i>
+      <div class="info-banner-text" id="txErrorText">Saldo tidak cukup.</div>
+    </div>
+
+    <button class="btn btn-primary" id="txSaveBtn" onclick="saveTransaction()" style="background:var(--primary); cursor:pointer;">Simpan Transaksi</button>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: KALKULATOR                                      -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="calcOverlay" onclick="closeCalcOutside(event)">
+  <div class="sheet" style="max-height:65vh;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Kalkulator</span>
+      <button class="sheet-close" onclick="closeCalcSheet()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="calc-display" id="calcDisplay">0</div>
+    <div class="calc-grid">
+      <button class="calc-btn calc-op" onclick="calcInput('C')">C</button>
+      <button class="calc-btn calc-op" onclick="calcInput('back')"><i class="bi bi-backspace"></i></button>
+      <button class="calc-btn calc-op" onclick="calcInput('%')">%</button>
+      <button class="calc-btn calc-op" onclick="calcInput('/')">÷</button>
+
+      <button class="calc-btn" onclick="calcInput('7')">7</button>
+      <button class="calc-btn" onclick="calcInput('8')">8</button>
+      <button class="calc-btn" onclick="calcInput('9')">9</button>
+      <button class="calc-btn calc-op" onclick="calcInput('*')">×</button>
+
+      <button class="calc-btn" onclick="calcInput('4')">4</button>
+      <button class="calc-btn" onclick="calcInput('5')">5</button>
+      <button class="calc-btn" onclick="calcInput('6')">6</button>
+      <button class="calc-btn calc-op" onclick="calcInput('-')">−</button>
+
+      <button class="calc-btn" onclick="calcInput('1')">1</button>
+      <button class="calc-btn" onclick="calcInput('2')">2</button>
+      <button class="calc-btn" onclick="calcInput('3')">3</button>
+      <button class="calc-btn calc-op" onclick="calcInput('+')">+</button>
+
+      <button class="calc-btn" onclick="calcInput('0')" style="grid-column: span 2;">0</button>
+      <button class="calc-btn" onclick="calcInput('000')">000</button>
+      <button class="calc-btn calc-equal" onclick="calcInput('=')">=</button>
+    </div>
+    <button class="btn btn-primary" onclick="useCalcResult()" style="margin-top:14px; background:var(--primary);">Gunakan Hasil</button>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: PICKER                                          -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="pickerOverlay" onclick="closePickerOutside(event)">
+  <div class="sheet" style="max-height:60vh;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="pickerTitle">Pilih</span>
+      <button class="sheet-close" onclick="closePicker()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="picker-list" id="pickerList"></div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: ACTION TRANSAKSI                                -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="actionSheetOverlay" onclick="closeActionSheetOutside(event)">
+  <div class="sheet" style="max-height:44vh;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="actionSheetTitle">Makan siang</span>
+      <button class="sheet-close" onclick="closeActionSheet()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="action-row" onclick="editTxFromAction()">
+      <div class="action-icon"><i class="bi bi-pencil"></i></div>
+      <span>Edit Transaksi</span>
+    </div>
+    <div class="action-row danger" onclick="deleteTxFromAction()">
+      <div class="action-icon danger"><i class="bi bi-trash"></i></div>
+      <span>Hapus Transaksi</span>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: PREVIEW LAMPIRAN                                -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="attachPreviewOverlay" onclick="closeAttachPreviewOutside(event)">
+  <div class="sheet" style="max-height:80vh; padding-top:10px;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="attachPreviewName">Lampiran</span>
+      <button class="sheet-close" onclick="closeAttachPreview()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <img id="attachPreviewImg" src="" alt="Lampiran" style="width:100%; border-radius:var(--radius-md); display:block;">
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: PILIH SATUAN PERIODE STATISTIK                  -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="statUnitSheetOverlay" onclick="closeStatUnitSheetOutside(event)">
+  <div class="sheet" style="max-height:70vh;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Pilih Periode</span>
+      <button class="sheet-close" onclick="closeStatUnitSheet()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="st-unit-option-list" id="statUnitOptionList"></div>
+
+    <div id="statUnitCustomStep" style="display:none; padding: 4px 4px 14px;">
+      <button class="st-sheet-back" onclick="statUnitSheetBack()"><i class="bi bi-chevron-left"></i> Kembali</button>
+      <div class="st-custom-mode-row" style="margin-top:10px;">
+        <button class="st-custom-mode-chip active" data-mode="tanggal" onclick="setStatCustomMode('tanggal')">Tanggal Tertentu</button>
+        <button class="st-custom-mode-chip" data-mode="rentang" onclick="setStatCustomMode('rentang')">Rentang Tanggal</button>
+      </div>
+      <button class="st-custom-pick-btn" onclick="openStatDatePicker()">
+        <i class="bi bi-calendar3"></i>
+        <span id="statCustomRangeLabel">Pilih tanggal</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: DATE PICKER (reusable, 4 mode)                  -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="dpOverlay" onclick="closeDatePickerOutside(event)">
+  <div class="dp-dialog" onclick="event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="dp-dialog-head">
+      <span class="sheet-title" id="dpTitle">Pilih Tanggal</span>
+      <button class="sheet-close" onclick="closeDatePicker()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
+    <!-- MODE: BULAN -->
+    <div id="dpModeBulan" style="display:none;">
+      <div class="dp-nav-row">
+        <button class="dp-nav-btn" onclick="dpShiftYear(-1)"><i class="bi bi-chevron-left"></i></button>
+        <span class="dp-nav-label" id="dpBulanYearLabel">2026</span>
+        <button class="dp-nav-btn" onclick="dpShiftYear(1)"><i class="bi bi-chevron-right"></i></button>
+      </div>
+      <div class="dp-month-grid" id="dpMonthGrid"></div>
+    </div>
+
+    <!-- MODE: TAHUN -->
+    <div id="dpModeTahun" style="display:none;">
+      <div class="dp-nav-row">
+        <button class="dp-nav-btn" onclick="dpShiftYearPage(-1)"><i class="bi bi-chevron-left"></i></button>
+        <span class="dp-nav-label" id="dpYearPageLabel">2024 – 2032</span>
+        <button class="dp-nav-btn" onclick="dpShiftYearPage(1)"><i class="bi bi-chevron-right"></i></button>
+      </div>
+      <div class="dp-year-grid" id="dpYearGrid"></div>
+    </div>
+
+    <!-- MODE: TANGGAL (harian) -->
+    <div id="dpModeTanggal" style="display:none;">
+      <div class="dp-nav-row">
+        <button class="dp-nav-btn" onclick="dpShiftCalMonth(-1)"><i class="bi bi-chevron-left"></i></button>
+        <span class="dp-nav-label" id="dpCalLabel">Juni 2026</span>
+        <button class="dp-nav-btn" onclick="dpShiftCalMonth(1)"><i class="bi bi-chevron-right"></i></button>
+      </div>
+      <div class="dp-cal-weekdays">
+        <span>M</span><span>S</span><span>S</span><span>R</span><span>K</span><span>J</span><span>S</span>
+      </div>
+      <div class="dp-cal-grid" id="dpCalGrid"></div>
+    </div>
+
+    <!-- MODE: RENTANG (custom) -->
+    <div id="dpModeRentang" style="display:none;">
+      <div class="dp-nav-row">
+        <button class="dp-nav-btn" onclick="dpShiftCalMonth(-1)"><i class="bi bi-chevron-left"></i></button>
+        <span class="dp-nav-label" id="dpRangeCalLabel">Juni 2026</span>
+        <button class="dp-nav-btn" onclick="dpShiftCalMonth(1)"><i class="bi bi-chevron-right"></i></button>
+      </div>
+      <div class="dp-cal-weekdays">
+        <span>M</span><span>S</span><span>S</span><span>R</span><span>K</span><span>J</span><span>S</span>
+      </div>
+      <div class="dp-cal-grid" id="dpRangeCalGrid"></div>
+
+      <div class="dp-range-inputs">
+        <div class="dp-range-field">
+          <label class="field-label">Dari</label>
+          <div class="field-card" style="cursor:default;">
+            <div class="field-card-icon" style="background:var(--accent2);"><i class="bi bi-calendar3"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="dpRangeFromLabel">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="dp-range-field">
+          <label class="field-label">Sampai</label>
+          <div class="field-card" style="cursor:default;">
+            <div class="field-card-icon" style="background:var(--accent2);"><i class="bi bi-calendar3"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="dpRangeToLabel">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODE: WAKTU -->
+    <div id="dpModeWaktu" style="display:none;">
+      <div class="dp-time-wrap">
+        <div class="dp-time-col">
+          <div class="dp-time-drum" id="dpDrumHour" data-unit="hour">
+            <div class="dp-time-drum-inner" id="dpDrumHourInner"></div>
+            <input class="dp-time-input" id="dpTimeHourInput" type="tel" maxlength="2" placeholder="00" inputmode="numeric" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+        <div class="dp-time-sep">:</div>
+        <div class="dp-time-col">
+          <div class="dp-time-drum" id="dpDrumMinute" data-unit="minute">
+            <div class="dp-time-drum-inner" id="dpDrumMinuteInner"></div>
+            <input class="dp-time-input" id="dpTimeMinuteInput" type="tel" maxlength="2" placeholder="00" inputmode="numeric" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="dp-dialog-footer">
+      <button class="btn btn-primary" id="dpApplyBtn" onclick="dpApply()">Terapkan</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: FILTER RIWAYAT (chip multi-select)             -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="rwFilterOverlay" onclick="rwFilterOutsideClick(event)">
+  <div class="sheet" style="max-height:85vh; overflow-y:auto;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Filter</span>
+      <button class="sheet-close" onclick="closeRwFilterSheet()"><i class="bi bi-x-lg"></i></button>
+    </div>
+
+    <!-- SECTION: Periode -->
+    <div class="rw-fs-section">
+      <div class="rw-fs-title">Rentang Tanggal</div>
+      <div class="rw-chip-wrap" id="rwfPeriodChips"></div>
+      <button class="rw-fs-pick-date" id="rwfPickDateBtn" onclick="openRwPeriodPicker()">
+        <i class="bi bi-calendar3"></i>
+        <span id="rwfPickDateLabel">Pilih tanggal</span>
+      </button>
+    </div>
+
+    <!-- SECTION: Jenis -->
+    <div class="rw-fs-section">
+      <div class="rw-fs-title">Jenis Transaksi</div>
+      <div class="rw-chip-wrap" id="rwfTypeChips"></div>
+    </div>
+
+    <!-- SECTION: Kategori -->
+    <div class="rw-fs-section">
+      <div class="rw-fs-title">Kategori</div>
+      <div class="rw-chip-wrap" id="rwfCatChips"></div>
+      <button class="rw-fs-see-all" id="rwfCatSeeAll" onclick="toggleRwCatAll()" style="display:none;">Lihat semua <i class="bi bi-chevron-down"></i></button>
+    </div>
+
+    <div class="rw-fs-actions">
+      <button class="rw-fs-reset-btn" onclick="resetRwFilter()">Hapus</button>
+      <button class="rw-fs-apply-btn" onclick="applyRwFilter()">Terapkan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- CONFIRM DIALOG (custom — menggantikan window.confirm)  -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="confirmDialogOverlay">
+  <div class="sheet" style="max-height:38vh;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="confirmDialogTitle">Konfirmasi</span>
+    </div>
+    <div style="padding:0 20px 8px;">
+      <p id="confirmDialogMsg" style="font-size:14px; color:var(--ink-700); line-height:1.55; margin:0 0 20px;"></p>
+      <button class="btn btn-primary" id="confirmDialogOkBtn" onclick="confirmDialogResolve(true)" style="background:var(--danger); width:100%; margin-bottom:10px;">Hapus</button>
+      <button class="btn" onclick="confirmDialogResolve(false)" style="width:100%; background:var(--surface-sunken); color:var(--ink-700);">Batal</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: BUDGET PENGATURAN                              -->
+<!-- ====================================================== -->
+<!-- ====================================================== -->
+<!-- SHEET: BUDGET MONTH PICKER                            -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="budgetMonthPickerOverlay" onclick="if(event.target===this)closeSheet('budgetMonthPickerOverlay')">
+  <div class="sheet" style="max-height:70vh;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Pilih Bulan</span>
+      <button class="sheet-close" onclick="closeSheet('budgetMonthPickerOverlay')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div style="padding:0 20px 32px; overflow-y:auto;">
+      <div class="bdg-year-nav">
+        <div class="icon-btn-sm" onclick="budgetPickerPrevYear()"><i class="bi bi-chevron-left"></i></div>
+        <span class="bdg-year-label" id="budgetPickerYear">2026</span>
+        <div class="icon-btn-sm" onclick="budgetPickerNextYear()"><i class="bi bi-chevron-right"></i></div>
+      </div>
+      <div class="bdg-month-grid" id="budgetMonthGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: BUDGET FORM                                    -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="budgetSheetOverlay" onclick="if(event.target===this)closeSheet('budgetSheetOverlay')">
+  <div class="sheet sheet-tall">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="budgetSheetTitle">Buat Budget</span>
+      <button class="sheet-close" onclick="closeSheet('budgetSheetOverlay')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div style="padding:0 20px 32px; overflow-y:auto; flex:1;">
+
+      <!-- Kategori -->
+      <div class="field">
+        <label class="field-label">Kategori Pengeluaran</label>
+        <div class="field-card placeholder" id="budgetCatCard" onclick="openBudgetCatPicker()">
+          <div class="field-card-icon-mono" id="budgetCatIconWrap"><i class="bi bi-grid"></i></div>
+          <div class="field-card-body">
+            <div class="field-card-title" id="budgetCatLabel">Pilih kategori</div>
+          </div>
+          <i class="bi bi-chevron-right field-card-chevron"></i>
+        </div>
+      </div>
+
+      <!-- Nominal -->
+      <div class="field">
+        <label class="field-label">Nominal Budget</label>
+        <div class="input input-row-box" style="padding-left:14px;">
+          <span class="input-prefix">Rp</span>
+          <input class="input-amount" id="budgetLimitInput" type="text" inputmode="numeric"
+                 enterkeyhint="done"
+                 style="border:none; padding:0; width:100%; background:transparent; color:var(--ink-900);"
+                 placeholder="0" oninput="formatBudgetInput(this)"
+                 onkeydown="if(event.key==='Enter')this.blur()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+      </div>
+
+      <!-- Ulangi -->
+      <div class="field">
+        <div class="bdg-repeat-row">
+          <div>
+            <div class="bdg-repeat-label">Ulangi setiap bulan</div>
+            <div class="bdg-repeat-sub">Budget otomatis muncul di bulan berikutnya</div>
+          </div>
+          <label class="bdg-toggle">
+            <input type="checkbox" id="budgetRepeatToggle" checked autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <span class="bdg-toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div id="budgetErrMsg" style="display:none; font-size:12.5px; color:var(--danger); margin-bottom:8px;"></div>
+
+      <button class="btn btn-primary" onclick="saveBudgetForm()">Simpan Budget</button>
+      <button class="btn" id="budgetDeleteBtn" onclick="deleteBudgetForm()"
+        style="margin-top:10px; background:var(--danger-100); color:var(--danger); display:none;">
+        <i class="bi bi-trash3"></i> Hapus Budget Ini
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- SHEET: BUDGET CATEGORY PICKER                         -->
+<!-- ====================================================== -->
+<div class="sheet-overlay" id="budgetCatPickerOverlay" onclick="if(event.target===this)closeSheet('budgetCatPickerOverlay')">
+  <div class="sheet" style="max-height:60vh;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Pilih Kategori</span>
+      <button class="sheet-close" onclick="closeSheet('budgetCatPickerOverlay')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="picker-list" id="budgetCategoryList"></div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- NOTIF PANEL (global — harus bisa dibuka dari semua halaman) -->
+<!-- ====================================================== -->
+<div class="notif-panel" id="notifPanel">
+  <div class="notif-panel-head-row">
+    <div class="notif-head" style="margin:0;">Pengingat</div>
+    <button class="notif-panel-add-btn" onclick="openCustomReminderForm(event)" title="Tambah pengingat"><i class="bi bi-plus-lg"></i></button>
+  </div>
+  <div class="notif-panel-list" id="notifPanelList"></div>
+  <div class="notif-empty" id="notifPanelEmpty">
+    <i class="bi bi-bell-slash"></i>
+    <span>Belum ada pengingat</span>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- TOAST                                                 -->
+<!-- ====================================================== -->
+<div class="toast" id="toast"></div>
+
+<!-- DIALOG KONFIRMASI NATIVE -- pengganti confirm() browser, dipakai global -->
+<div class="sheet-overlay" id="nativeConfirmOverlay" onclick="if(event.target===this)closeSheet('nativeConfirmOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div style="padding:8px 24px 24px; text-align:center;">
+      <div id="nativeConfirmIconWrap" style="width:48px; height:48px; border-radius:50%; background:var(--danger-100); display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+        <i class="bi bi-exclamation-triangle-fill" style="color:var(--danger); font-size:20px;"></i>
+      </div>
+      <div id="nativeConfirmMsg" style="font-size:14px; font-weight:600; color:var(--ink-900); line-height:1.5; margin-bottom:22px; white-space:pre-line;"></div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" style="background:var(--surface-sunken); color:var(--ink-700); width:auto; flex:1;" onclick="closeSheet('nativeConfirmOverlay')">Batal</button>
+        <button class="btn btn-primary" id="nativeConfirmOkBtn" style="background:var(--danger); width:auto; flex:1;" onclick="_nativeConfirmOk()">Ya</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL REMINDER (GC-04) -- tampil satu per satu tiap ada reminder pending -->
+<div class="sheet-overlay" id="reminderModalOverlay">
+  <div class="reminder-modal-card">
+    <button class="reminder-modal-close" onclick="closeReminderModal()"><i class="bi bi-x-lg"></i></button>
+    <div class="reminder-modal-icon" id="reminderModalIconWrap">
+      <i id="reminderModalIcon" class="bi bi-bell-fill"></i>
+    </div>
+    <div class="reminder-modal-title" id="reminderModalTitle"></div>
+    <div class="reminder-modal-msg" id="reminderModalMsg"></div>
+    <div class="reminder-modal-actions">
+      <button class="btn btn-primary" style="width:100%;" onclick="closeReminderModal()">Oke, Mengerti</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORM REMINDER CUSTOM -->
+<div class="sheet-overlay" id="customReminderFormOverlay" onclick="if(event.target===this)closeSheet('customReminderFormOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <div class="sheet-title">Pengingat Baru</div>
+      <div class="icon-btn-sm" onclick="closeSheet('customReminderFormOverlay')"><i class="bi bi-x-lg"></i></div>
+    </div>
+    <div style="padding-bottom:8px;">
+      <div class="custom-reminder-form-row">
+        <div class="custom-reminder-form-label">Judul</div>
+        <input class="input" id="crFormTitle" placeholder="cth. Bayar cicilan Kredivo" maxlength="60" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="custom-reminder-form-row">
+        <div class="custom-reminder-form-label">Pesan (opsional)</div>
+        <input class="input" id="crFormMsg" placeholder="cth. Jangan sampai telat, kena denda" maxlength="120" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="custom-reminder-form-row" style="display:flex; gap:10px;">
+        <div style="flex:1;">
+          <div class="custom-reminder-form-label">Tanggal</div>
+          <div class="field-card" onclick="openTxDatePicker('crFormDate','crFormDateLabel')">
+            <div class="field-card-icon" style="background:var(--primary-100); color:var(--primary);"><i class="bi bi-calendar-event"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="crFormDateLabel">Pilih tanggal</div>
+            </div>
+          </div>
+          <input type="hidden" id="crFormDate" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+        <div style="flex:1;">
+          <div class="custom-reminder-form-label">Jam</div>
+          <div class="field-card" onclick="openTxTimePicker('crFormTime','crFormTimeLabel')">
+            <div class="field-card-icon" style="background:var(--primary-100); color:var(--primary);"><i class="bi bi-clock"></i></div>
+            <div class="field-card-body">
+              <div class="field-card-title" id="crFormTimeLabel">Pilih jam</div>
+            </div>
+          </div>
+          <input type="hidden" id="crFormTime" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+      </div>
+      <div id="crFormErrMsg" style="display:none; color:var(--danger); font-size:11.5px; font-weight:600; margin-bottom:12px;"></div>
+      <button class="btn btn-primary" style="width:100%;" onclick="saveCustomReminderForm()">Simpan Pengingat</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ====================================================== -->
+<!-- SCRIPTS                                               -->
+<!-- ====================================================== -->
+<script src="storage.js"></script>
+<script src="notifikasi.js"></script>
+<script src="akun.js"></script>
+<script src="statistik.js"></script>
+<script src="settings.js"></script>
+<script src="app.js"></script>
+<script src="datepicker.js"></script>
+<script src="riwayat.js"></script>
+
+<!-- ====================================================== -->
+<!-- MODULES (placeholder)                                  -->
+<!-- ====================================================== -->
+<script src="budget.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+<script src="wishlist.js"></script>
+<script src="dana-darurat.js"></script>
+<script src="jurnal-investasi.js"></script>
+<script src="utang-piutang.js"></script>
+
+
+<!-- ====================================================== -->
+<!-- ONBOARDING                                            -->
+<!-- ====================================================== -->
+<div class="onb-overlay" id="onbOverlay">
+
+  <!-- WELCOME -->
+  <div class="onb-page onb-welcome active" id="onbPageWelcome">
+    <div class="onb-blobs">
+      <div class="onb-blob onb-blob-a"></div>
+      <div class="onb-blob onb-blob-b"></div>
+      <div class="onb-blob onb-blob-c"></div>
+    </div>
+    <div class="onb-welcome-inner">
+      <div><img src="logo-keluang.png" alt="KELUANG" class="brand-logo"></div>
+      <div class="onb-welcome-actions">
+        <button class="btn onb-btn-light" onclick="onbStartNew()">Buat Akun Baru</button>
+        <button class="btn onb-btn-ghost" onclick="triggerRestoreFile()">
+          <i class="bi bi-cloud-arrow-up"></i> Pulihkan dari Backup
+        </button>
+      </div>
+      <div class="onb-welcome-note">Sudah pernah pakai Keluang di perangkat lain? Pulihkan datamu dari file backup.</div>
+    </div>
+  </div>
+
+  <!-- STEP 1: Profil -->
+  <div class="onb-page onb-step-panel" id="onbStep0">
+    <div class="onb-hero">
+      <button class="onb-hero-back" onclick="onbSetActivePage('onbPageWelcome')"><i class="bi bi-arrow-left"></i></button>
+      <div class="onb-blobs">
+        <div class="onb-blob onb-blob-a"></div>
+        <div class="onb-blob onb-blob-b"></div>
+      </div>
+      <div class="onb-hero-text">
+        <div class="onb-hero-heading">Halo!<br>Siapa namamu?</div>
+      </div>
+    </div>
+    <div class="onb-card">
+      <div class="onb-icon-wrap">
+        <div class="onb-avatar" id="onbAvatarPreview">
+          <i class="bi bi-person-fill"></i>
+        </div>
+        <button class="onb-avatar-btn" onclick="document.getElementById('onbAvatarUpload').click()">
+          <i class="bi bi-camera-fill"></i>
+        </button>
+        <input type="file" id="onbAvatarUpload" accept="image/*" style="display:none;" onchange="onbHandleAvatar(event)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="onb-sub" style="text-align:center;">Foto profil bersifat opsional, bisa diubah kapan saja di Pengaturan.</div>
+      <div class="field" style="margin-top:20px;">
+        <label class="field-label">Nama</label>
+        <input class="input" id="onbName" placeholder="cth. Raka, Budi, Siti..." oninput="onbValidateStep0()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <button class="btn btn-primary" id="onbBtn0" onclick="onbNext()" disabled>Lanjut</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: Buat Akun Pertama -->
+  <div class="onb-page onb-step-panel" id="onbStep1">
+    <div class="onb-hero">
+      <button class="onb-hero-back" onclick="onbBack()"><i class="bi bi-arrow-left"></i></button>
+      <div class="onb-blobs">
+        <div class="onb-blob onb-blob-a"></div>
+        <div class="onb-blob onb-blob-c"></div>
+      </div>
+      <div class="onb-hero-text">
+        <div class="onb-hero-heading">Buat akun<br>pertamamu</div>
+      </div>
+    </div>
+    <div class="onb-card">
+      <div class="onb-sub">Minimal satu akun liquid diperlukan untuk mulai mencatat transaksi.</div>
+
+      <div class="field" style="margin-top:20px;">
+        <label class="field-label">Jenis Akun</label>
+        <div class="type-seg" id="onbJenisSeg">
+          <div class="type-seg-item active" data-jenis="rekening">Bank</div>
+          <div class="type-seg-item" data-jenis="ewallet">E-Wallet</div>
+          <div class="type-seg-item" data-jenis="tunai">Cash</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Nama Akun</label>
+        <input class="input" id="onbAccName" placeholder="cth. BCA Tabungan, GoPay, Dompet" oninput="onbValidateStep1()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+
+      <div class="field">
+        <label class="field-label">Saldo Awal</label>
+        <div class="input input-row-box" style="padding-left:14px;">
+          <span class="input-prefix">Rp</span>
+          <input class="input-amount" id="onbSaldo" style="border:none; padding:0; width:100%; background:transparent;" placeholder="0" inputmode="numeric" oninput="formatOnbSaldo(this)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+        <div class="onb-saldo-note">Saldo awal akan tercatat sebagai transaksi "Saldo Awal"</div>
+      </div>
+
+      <button class="btn btn-primary" id="onbBtn1" onclick="onbNext()" disabled>Lanjut</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: Konfirmasi -->
+  <div class="onb-page onb-step-panel" id="onbStep2">
+    <div class="onb-hero">
+      <button class="onb-hero-back" onclick="onbBack()"><i class="bi bi-arrow-left"></i></button>
+      <div class="onb-blobs">
+        <div class="onb-blob onb-blob-a"></div>
+        <div class="onb-blob onb-blob-b"></div>
+        <div class="onb-blob onb-blob-c"></div>
+      </div>
+      <div class="onb-hero-text">
+        <div class="onb-check"><i class="bi bi-check-lg"></i></div>
+        <div class="onb-hero-heading" id="onbConfirmTitle">Siap!</div>
+      </div>
+    </div>
+    <div class="onb-card">
+      <div class="onb-sub">Semua sudah siap. Mulai catat keuanganmu sekarang.</div>
+      <div class="onb-summary" id="onbSummary"></div>
+      <button class="btn btn-primary" onclick="onbFinish()" style="margin-top:20px;">Mulai Keluang <i class="bi bi-arrow-right"></i></button>
+    </div>
+  </div>
+
+  <!-- Step dots (hidden on Welcome page) -->
+  <div class="onb-steps" id="onbStepsDots">
+    <div class="onb-step active" id="onbDot0"></div>
+    <div class="onb-step" id="onbDot1"></div>
+    <div class="onb-step" id="onbDot2"></div>
+  </div>
+
+</div>
+
+</body>
+</html>
