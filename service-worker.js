@@ -14,7 +14,7 @@
 //    di index.html sebelum app.js — ditambahkan supaya modul
 //    pengingat tidak gagal load saat offline.
 
-const CACHE_NAME = 'keluang-v7';
+const CACHE_NAME = 'keluang-v8.1';
 
 // Aset lokal (same-origin) — aman di-precache dengan cache.addAll
 const LOCAL_ASSETS = [
